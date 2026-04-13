@@ -1,17 +1,33 @@
-//
-//  FrndApp.swift
-//  Frnd
-//
-//  Created by Eric Carmi on 4/13/26.
-//
-
 import SwiftUI
 
 @main
 struct FrndApp: App {
+    @StateObject private var appState = AppState.shared
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .environmentObject(appState)
+                .preferredColorScheme(.dark)
         }
+    }
+}
+
+struct RootView: View {
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        Group {
+            if appState.isAuthenticated && appState.onboardingComplete {
+                MainTabView()
+            } else if appState.isAuthenticated && !appState.onboardingComplete {
+                // User is authed but hasn't finished onboarding
+                OnboardingView()
+            } else {
+                OnboardingView()
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: appState.isAuthenticated)
+        .animation(.easeInOut(duration: 0.3), value: appState.onboardingComplete)
     }
 }

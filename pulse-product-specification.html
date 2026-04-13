@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse — Product Specification Document</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Satoshi:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0c0c0f;
+  --surface: #16161a;
+  --surface-raised: #1e1e24;
+  --border: #2a2a32;
+  --text: #e8e6e3;
+  --text-dim: #9a9a9f;
+  --accent: #ff6b35;
+  --accent-glow: #ff6b3525;
+  --teal: #2dd4bf;
+  --teal-glow: #2dd4bf20;
+  --violet: #a78bfa;
+  --violet-glow: #a78bfa20;
+  --rose: #fb7185;
+  --gold: #fbbf24;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Satoshi', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.75;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Layout */
+.page { max-width: 880px; margin: 0 auto; padding: 48px 24px 120px; }
+
+/* Navigation */
+.toc {
+  position: fixed; left: 0; top: 0; width: 260px; height: 100vh;
+  background: var(--surface); border-right: 1px solid var(--border);
+  padding: 32px 20px; overflow-y: auto; z-index: 100;
+  display: none;
+}
+@media(min-width:1280px) {
+  .toc { display: block; }
+  .page { margin-left: 260px; max-width: 920px; padding-left: 64px; padding-right: 48px; }
+}
+.toc h3 {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 20px;
+}
+.toc a {
+  display: block; color: var(--text-dim); text-decoration: none;
+  font-size: 13px; padding: 6px 0; transition: color .2s;
+}
+.toc a:hover { color: var(--accent); }
+.toc a.sub { padding-left: 16px; font-size: 12px; }
+
+/* Hero */
+.hero { padding: 60px 0 48px; border-bottom: 1px solid var(--border); margin-bottom: 56px; }
+.hero .eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 20px;
+}
+.hero h1 {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(40px, 6vw, 64px); line-height: 1.05;
+  margin-bottom: 20px; font-weight: 400;
+}
+.hero h1 em { font-style: italic; color: var(--accent); }
+.hero .tagline { font-size: 18px; color: var(--text-dim); max-width: 560px; }
+.hero .meta-row {
+  display: flex; gap: 24px; margin-top: 28px; flex-wrap: wrap;
+}
+.hero .meta-pill {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--text-dim); background: var(--surface-raised);
+  border: 1px solid var(--border); border-radius: 100px;
+  padding: 6px 16px;
+}
+
+/* Sections */
+.section { margin-bottom: 64px; }
+.section-num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 8px;
+}
+.section h2 {
+  font-family: 'Instrument Serif', serif;
+  font-size: 32px; font-weight: 400; margin-bottom: 20px; line-height: 1.2;
+}
+.section h3 {
+  font-size: 18px; font-weight: 700; margin: 32px 0 12px;
+  color: var(--text);
+}
+.section h4 {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--teal); margin: 28px 0 10px;
+}
+.section p { color: var(--text-dim); margin-bottom: 14px; }
+.section p strong { color: var(--text); font-weight: 600; }
+
+/* Feature Cards */
+.feature-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px; margin: 24px 0;
+}
+.feature-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 24px; position: relative; overflow: hidden;
+  transition: border-color .2s;
+}
+.feature-card:hover { border-color: var(--accent); }
+.feature-card .icon { font-size: 28px; margin-bottom: 12px; }
+.feature-card h5 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+.feature-card p { font-size: 13px; color: var(--text-dim); margin: 0; line-height: 1.6; }
+.feature-card .tag {
+  position: absolute; top: 16px; right: 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 4px;
+}
+.tag.core { background: var(--accent-glow); color: var(--accent); }
+.tag.social { background: var(--violet-glow); color: var(--violet); }
+.tag.ai { background: var(--teal-glow); color: var(--teal); }
+.tag.growth { background: #fbbf2420; color: var(--gold); }
+
+/* Spec Tables */
+.spec-table {
+  width: 100%; border-collapse: collapse;
+  margin: 20px 0; font-size: 14px;
+}
+.spec-table th {
+  text-align: left; padding: 12px 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--accent); border-bottom: 2px solid var(--accent);
+  background: var(--surface);
+}
+.spec-table td {
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.spec-table td:first-child { color: var(--text); font-weight: 600; white-space: nowrap; }
+.spec-table td:last-child { color: var(--text-dim); }
+.spec-table tr:last-child td { border-bottom: none; }
+
+/* Code/Tech blocks */
+.tech-block {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 20px 24px; margin: 16px 0;
+  font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+  color: var(--text-dim); line-height: 1.8;
+}
+.tech-block .layer {
+  display: flex; align-items: baseline; gap: 12px; padding: 4px 0;
+}
+.tech-block .layer-label {
+  color: var(--accent); font-weight: 500; min-width: 100px; text-align: right;
+}
+
+/* Callout */
+.callout {
+  border-left: 3px solid var(--accent); padding: 20px 24px;
+  background: var(--accent-glow); border-radius: 0 10px 10px 0;
+  margin: 28px 0;
+}
+.callout.teal { border-left-color: var(--teal); background: var(--teal-glow); }
+.callout.violet { border-left-color: var(--violet); background: var(--violet-glow); }
+.callout h5 { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.callout p { font-size: 14px; color: var(--text-dim); margin: 0; }
+
+/* Color palette swatches */
+.palette {
+  display: flex; gap: 12px; flex-wrap: wrap; margin: 20px 0;
+}
+.swatch {
+  width: 72px; height: 72px; border-radius: 14px; position: relative;
+  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+}
+.swatch::after {
+  content: attr(data-name);
+  position: absolute; bottom: -22px; left: 0; right: 0; text-align: center;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-dim);
+}
+.swatch-row { margin-bottom: 40px; }
+.swatch-row-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-dim); margin-bottom: 10px;
+}
+
+/* Typography specimen */
+.type-specimen { margin: 20px 0; }
+.type-row { display: flex; align-items: baseline; gap: 20px; margin-bottom: 16px; flex-wrap: wrap; }
+.type-role {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-dim); min-width: 100px;
+}
+
+/* Screen flow */
+.flow {
+  display: flex; gap: 12px; align-items: center; margin: 24px 0;
+  overflow-x: auto; padding-bottom: 12px;
+}
+.flow-step {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px 20px; min-width: 140px; text-align: center;
+  flex-shrink: 0;
+}
+.flow-step .num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 20px; font-weight: 700; color: var(--accent); margin-bottom: 4px;
+}
+.flow-step .label { font-size: 12px; color: var(--text-dim); }
+.flow-arrow { color: var(--text-dim); font-size: 20px; flex-shrink: 0; }
+
+/* Divider */
+hr { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+
+/* Lists inside sections */
+.section ul { list-style: none; padding: 0; margin: 12px 0; }
+.section ul li {
+  position: relative; padding-left: 20px; margin-bottom: 10px;
+  font-size: 14px; color: var(--text-dim);
+}
+.section ul li::before {
+  content: ''; position: absolute; left: 0; top: 9px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+}
+.section ul li strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <a href="#vision">Product Vision</a>
+  <a href="#audience">Target Audience</a>
+  <a href="#features">Core Features</a>
+  <a class="sub" href="#discovery">Discovery Engine</a>
+  <a class="sub" href="#social">Social Layer</a>
+  <a class="sub" href="#foryou">For You Feed</a>
+  <a class="sub" href="#organizer">Organizer Tools</a>
+  <a class="sub" href="#chat">Chat & Plans</a>
+  <a href="#screens">Screen Architecture</a>
+  <a href="#design">Design Language</a>
+  <a class="sub" href="#color">Color System</a>
+  <a class="sub" href="#typography">Typography</a>
+  <a class="sub" href="#motion">Motion & Interaction</a>
+  <a class="sub" href="#components">Components</a>
+  <a href="#backend">Backend Architecture</a>
+  <a href="#data">Data & AI Pipeline</a>
+  <a href="#growth">Growth & Monetization</a>
+  <a href="#launch">Launch Strategy</a>
+</nav>
+
+<div class="page">
+
+<!-- ========== HERO ========== -->
+<header class="hero">
+  <div class="eyebrow">Product Specification Document v1.0</div>
+  <h1>Pulse<em>.</em><br>Your city, tonight.</h1>
+  <p class="tagline">A hyperlocal event discovery and social planning app that answers the two questions existing platforms ignore: "What should I do tonight?" and "Who am I going with?"</p>
+  <div class="meta-row">
+    <span class="meta-pill">Mobile First (iOS + Android)</span>
+    <span class="meta-pill">React Native + Python</span>
+    <span class="meta-pill">AI Personalized</span>
+    <span class="meta-pill">Social Graph Core</span>
+  </div>
+</header>
+
+<!-- ========== 01 VISION ========== -->
+<div class="section" id="vision">
+  <div class="section-num">01 — Product Vision</div>
+  <h2>The thesis behind Pulse</h2>
+  <p>Existing event platforms treat discovery as a search problem: browse categories, filter by date, buy a ticket. But for the vast majority of people, especially those under 35, the decision to go out is social first and event second. They ask their group chat "what are we doing tonight?" long before they open Eventbrite.</p>
+  <p><strong>Pulse inverts the model.</strong> Instead of starting with a catalogue of events, it starts with your social context: who you are, who you know, what you have liked, and what your friends are doing. The event feed is built around you. The social layer is not bolted on after the fact; it is the architecture.</p>
+  <p>The product sits at the intersection of three categories that are converging: event discovery (Eventbrite, Fever), social planning (group chats, iMessage polls), and friend matching (Washed Up, Mmotion). Pulse is designed to be the single surface where all three happen.</p>
+
+  <div class="callout">
+    <h5>One sentence pitch</h5>
+    <p>Pulse is a Spotify Discover Weekly for real life experiences: a personalized, social, AI powered feed of things to do near you, with built in tools to rally your crew and go.</p>
+  </div>
+</div>
+
+<!-- ========== 02 AUDIENCE ========== -->
+<div class="section" id="audience">
+  <div class="section-num">02 — Target Audience</div>
+  <h2>Who is this for</h2>
+
+  <h3>Primary: Urban 18 to 30 year olds</h3>
+  <p>College students, recent graduates, and young professionals in dense metro areas who are socially active but overwhelmed by options. They check Instagram stories to see where friends are going, rely on word of mouth over algorithms, and are more likely to attend something if a friend is already going. They are comfortable with TikTok style vertical feeds and Spotify style personalization. They do not want to browse a catalogue; they want to be told "this is for you."</p>
+
+  <h3>Secondary: Event organizers and local venues</h3>
+  <p>Small to mid size event creators (comedy shows, DJ sets, art walks, pop ups, club nights, campus organizations) who struggle with distribution. They are currently paying Eventbrite 10 to 14% of ticket revenue and getting limited discovery. Pulse offers them free or near free listing with genuine demand side distribution in exchange for supply exclusivity.</p>
+
+  <h3>Tertiary: "New to the city" transplants</h3>
+  <p>People who have recently moved and do not yet have a social circle. They are the highest intent users for the social matching features and the most likely to convert to paid premium tiers that unlock expanded friend discovery.</p>
+</div>
+
+<!-- ========== 03 FEATURES ========== -->
+<div class="section" id="features">
+  <div class="section-num">03 — Core Features</div>
+  <h2>What Pulse does</h2>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <span class="tag core">Core</span>
+      <div class="icon">🎯</div>
+      <h5>For You Feed</h5>
+      <p>An AI curated, vertically scrollable feed of events personalized to your taste, location, schedule, and social graph. Each card shows who among your friends is interested or going.</p>
+    </div>
+    <div class="feature-card">
+      <span class="tag social">Social</span>
+      <div class="icon">👥</div>
+      <h5>Pulse Plans</h5>
+      <p>Create a "Plan" around any event: invite friends, vote on options, split logistics. Plans are lightweight group threads tied to a specific night or event, not permanent group chats.</p>
+    </div>
+    <div class="feature-card">
+      <span class="tag ai">AI</span>
+      <div class="icon">🧠</div>
+      <h5>Taste Engine</h5>
+      <p>Connects to Spotify, Apple Music, Instagram, and calendar. Learns from swipes, taps, saves, and attendance history to build a multi dimensional taste profile that improves weekly.</p>
+    </div>
+    <div class="feature-card">
+      <span class="tag social">Social</span>
+      <div class="icon">🤝</div>
+      <h5>Pulse Match</h5>
+      <p>For users without a crew: match with nearby people who share taste profiles and are interested in the same events. Opt in only. Group match (3 to 5 people) to reduce awkwardness.</p>
+    </div>
+    <div class="feature-card">
+      <span class="tag core">Core</span>
+      <div class="icon">🗺️</div>
+      <h5>Live Map</h5>
+      <p>A real time map view showing events happening now, tonight, and this weekend. Heat zones indicate social activity density. Tap any pin for a quick preview card with one tap RSVP.</p>
+    </div>
+    <div class="feature-card">
+      <span class="tag growth">Growth</span>
+      <div class="icon">🏠</div>
+      <h5>Venue Pages</h5>
+      <p>Every venue gets a living page: upcoming schedule, vibe tags, photos from past events (user submitted), and a "regulars" count. Venues claim and customize their pages for free.</p>
+    </div>
+    <div class="feature-card">
+      <span class="tag ai">AI</span>
+      <div class="icon">📅</div>
+      <h5>Smart Nudges</h5>
+      <p>Push notifications powered by context: "3 of your friends are going to Jazz at the Promontory tonight" or "Based on your Friday pattern, here is your weekend starter pack."</p>
+    </div>
+    <div class="feature-card">
+      <span class="tag core">Core</span>
+      <div class="icon">🎟️</div>
+      <h5>Inline Ticketing</h5>
+      <p>Buy tickets or RSVP without leaving the app. For free events, one tap RSVP. For paid events, Apple Pay / Google Pay checkout in under 3 seconds. Zero fees for organizers at launch.</p>
+    </div>
+  </div>
+
+  <!-- FOR YOU FEED DETAIL -->
+  <h3 id="foryou">The "For You" Feed in Detail</h3>
+  <p>This is the primary screen and the core product experience. It is not a list of events; it is a personalized, ranked, infinitely scrollable feed of cards, each representing an event or experience. The ranking algorithm considers the following signals, weighted in roughly this order of importance:</p>
+  <ul>
+    <li><strong>Social signal:</strong> How many of your friends or mutual connections have expressed interest (saved, RSVPed, or shared). This is the single strongest signal. An event where 3 friends are going should always rank above a "better fit" event where nobody you know is going.</li>
+    <li><strong>Taste match:</strong> Cosine similarity between the event's attribute vector and your taste profile (built from music listening, past attendance, saved events, and explicit preferences during onboarding).</li>
+    <li><strong>Temporal relevance:</strong> Events happening tonight or this weekend are boosted. Events more than 14 days out are significantly deprioritized unless they are high demand and selling fast.</li>
+    <li><strong>Proximity:</strong> Distance from user's current location or home location. Adjustable radius (default 5 miles, expandable to 25).</li>
+    <li><strong>Novelty:</strong> A diversity injection to prevent echo chambers. Every 5th to 7th card is a "wildcard" from a category the user has not explored, labeled "Something different" to set expectations.</li>
+    <li><strong>Trending momentum:</strong> RSVPs per hour, share velocity, and save rate relative to similar events at the same stage of their lifecycle.</li>
+    <li><strong>Organizer quality score:</strong> A behind the scenes rating based on past event attendance rates, user reviews, and repeat attendee percentage.</li>
+  </ul>
+
+  <div class="callout teal">
+    <h5>Design principle: show the people, not just the event</h5>
+    <p>Every event card in the feed must surface social proof: friend avatars ("Alex, Jordan + 4 others going"), a vibe tag generated from attendee demographics ("Chill crowd, 20s, artsy"), and a one line AI summary of why this event was recommended for you.</p>
+  </div>
+
+  <!-- SOCIAL LAYER DETAIL -->
+  <h3 id="social">The Social Layer in Detail</h3>
+  <p>Pulse's social graph is purpose built for going out, not for broadcasting content or messaging at scale. It distinguishes between three relationship tiers:</p>
+  <ul>
+    <li><strong>Inner circle (max 15):</strong> Your ride or dies. Their activity is always visible. When they RSVP, you get a push notification. You can see their upcoming plans. Mutual opt in required.</li>
+    <li><strong>Friends (uncapped):</strong> Imported from contacts + added in app. Their attendance appears as social proof on event cards. You can invite them to Plans. Standard friend model.</li>
+    <li><strong>Pulse connections:</strong> People you have matched with or attended events with but have not formally friended. Lightweight, low commitment. Their activity appears anonymized ("12 people with similar taste are going").</li>
+  </ul>
+
+  <h3 id="chat">Pulse Plans and Chat</h3>
+  <p>A Plan is the atomic social unit of the app. It is created around an event or a time window ("Saturday night") and serves as a lightweight, ephemeral group thread. Plans have a lifecycle:</p>
+  <ul>
+    <li><strong>Proposal:</strong> A user creates a Plan, optionally attaching 1 to 3 event options. They invite friends from their circle.</li>
+    <li><strong>Voting:</strong> If multiple options are attached, invitees vote with a single tap. Majority wins. Ties are broken by the creator.</li>
+    <li><strong>Locked:</strong> Once an event is confirmed, the Plan becomes a logistics hub: meeting time, meeting point, shared ride link, ticket purchase reminders.</li>
+    <li><strong>Live:</strong> During the event, the Plan thread supports real time location sharing ("I am at the bar near the entrance") and quick photo sharing.</li>
+    <li><strong>Archive:</strong> After the event, the Plan becomes a memory: a photo grid, attendee list, and a prompt to rate the experience. Plans auto archive 24 hours after the event ends.</li>
+  </ul>
+  <p>Plans are not permanent group chats. They are born, they serve their purpose, and they dissolve. This prevents the notification fatigue and ghost chat problem that kills engagement in messaging heavy apps.</p>
+
+  <!-- DISCOVERY ENGINE -->
+  <h3 id="discovery">Discovery Engine</h3>
+  <p>Pulse aggregates events from multiple sources to ensure comprehensive coverage without relying on organizers to manually list:</p>
+  <ul>
+    <li><strong>Direct integrations:</strong> API connections to Eventbrite, Dice, Bandsintown, and university calendar systems (starting with UChicago, Northwestern, DePaul, Loyola, and UIC for the Chicago launch).</li>
+    <li><strong>Web scraping pipeline:</strong> A scheduled crawler that scrapes venue websites, Facebook event pages, Instagram bios of local promoters, and municipal event calendars. NLP classification tags each event automatically.</li>
+    <li><strong>Organizer self serve:</strong> A simple web dashboard where organizers can list events for free, manage RSVPs, and access audience analytics. The value proposition is distribution to Pulse's demand side user base.</li>
+    <li><strong>User submissions:</strong> Any user can submit an event they have heard about. Submissions are verified (duplicate check, venue confirmation) before going live. Submitters earn reputation points.</li>
+  </ul>
+
+  <!-- ORGANIZER TOOLS -->
+  <h3 id="organizer">Organizer Tools</h3>
+  <p>The organizer dashboard is a lightweight web app (not a native mobile experience) with the following features:</p>
+  <ul>
+    <li><strong>Event creation:</strong> Title, date/time, venue (autocomplete from database), description, category tags, ticket price (or free), capacity, cover image. Under 2 minutes to complete.</li>
+    <li><strong>Audience insights:</strong> Demographics of interested users (age range, taste clusters, neighborhood). This is the primary value proposition for organizers and replaces the opaque Eventbrite analytics.</li>
+    <li><strong>Promoted events:</strong> Paid boost that places the event higher in For You feeds within a target radius and demographic. CPM or CPC pricing. This is the primary revenue stream.</li>
+    <li><strong>RSVP and ticket management:</strong> Guest list, check in QR codes, attendee messaging. Basic CRM functionality.</li>
+    <li><strong>Post event report:</strong> Attendance rate, demographic breakdown, social reach (how many users saw the event via friend activity), and a "return likelihood" score predicting repeat attendance.</li>
+  </ul>
+</div>
+
+<!-- ========== 04 SCREENS ========== -->
+<div class="section" id="screens">
+  <div class="section-num">04 — Screen Architecture</div>
+  <h2>Information architecture and navigation</h2>
+
+  <p>The app uses a bottom tab bar with five primary destinations. The tab bar uses translucent blur (glassmorphism) so the content scrolls beneath it, maintaining immersion.</p>
+
+  <table class="spec-table">
+    <tr><th>Tab</th><th>Screen</th><th>Purpose</th></tr>
+    <tr><td>For You</td><td>Personalized event feed</td><td>Primary discovery. Vertical scroll. Cards. Default landing screen.</td></tr>
+    <tr><td>Map</td><td>Live map view</td><td>Spatial discovery. Clusters, heat zones, filterable by time and category.</td></tr>
+    <tr><td>Plans</td><td>Active and past plans</td><td>Social planning hub. Active plans at top, past memories below. Badge count for pending invites.</td></tr>
+    <tr><td>Search</td><td>Explore + search</td><td>Category browsing, keyword search, trending events, curated collections ("Date Night in Hyde Park").</td></tr>
+    <tr><td>Profile</td><td>User profile</td><td>Taste profile visualization, friends list, attendance history, saved events, settings.</td></tr>
+  </table>
+
+  <h3>Onboarding Flow</h3>
+  <p>Progressive disclosure. Never ask for everything upfront. The onboarding is designed to deliver value before asking for commitment.</p>
+
+  <div class="flow">
+    <div class="flow-step"><div class="num">1</div><div class="label">Phone # or Apple/Google sign in</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step"><div class="num">2</div><div class="label">Pick 5 vibe tags from a visual grid</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step"><div class="num">3</div><div class="label">Connect Spotify (optional, highly prompted)</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step"><div class="num">4</div><div class="label">Import contacts to find friends</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step"><div class="num">5</div><div class="label">See your first For You feed immediately</div></div>
+  </div>
+
+  <p>Steps 3 and 4 are skippable but the feed quality degrades noticeably without them. The app should communicate this clearly: "Your feed gets 3x better with Spotify connected" with a real time preview showing how recommendations change.</p>
+
+  <h3>Key Screen Details</h3>
+
+  <h4>Event Card (For You Feed)</h4>
+  <p>The event card is the most important UI element in the entire app. It must convey the following in a single glance, without requiring a tap:</p>
+  <ul>
+    <li><strong>Hero image:</strong> Full bleed, 16:9 aspect ratio. If no image is available, auto generate a gradient with event title overlay using the category color.</li>
+    <li><strong>Event title:</strong> Max 2 lines, truncated with ellipsis. Bold, high contrast.</li>
+    <li><strong>Venue + distance:</strong> Single line. "The Promontory · 0.8 mi"</li>
+    <li><strong>Date/time pill:</strong> "Tonight, 8 PM" or "Sat, Apr 18 · 7 PM". Relative time for events within 48 hours.</li>
+    <li><strong>Price pill:</strong> "Free" (green) or "$15" (neutral) or "From $25" (neutral).</li>
+    <li><strong>Social proof row:</strong> Up to 3 friend avatars + "Alex, Jordan + 4 going". If no friends, show "47 people interested" or the vibe tag.</li>
+    <li><strong>AI reason chip:</strong> A single line explaining the recommendation: "Because you liked Jazz at the Promontory" or "Trending in Hyde Park".</li>
+    <li><strong>Action row:</strong> Three icon buttons: Save (bookmark), Share (send to friend or Plan), RSVP/Buy.</li>
+  </ul>
+
+  <h4>Event Detail Screen</h4>
+  <p>Opened by tapping a card. The hero image expands to full width with a parallax scroll effect. Below the image:</p>
+  <ul>
+    <li>Title, date/time, venue (tappable for directions), and price, repeated from the card for context anchoring.</li>
+    <li><strong>Attendee strip:</strong> Horizontal scroll of avatars with names. Friends first, then mutual connections, then anonymous count.</li>
+    <li><strong>Description:</strong> Organizer provided text. Collapsible if over 4 lines. Markdown supported.</li>
+    <li><strong>Vibe tags:</strong> User generated tags ("Chill", "Loud", "Outdoor", "BYOB"). Crowdsourced from past attendees if the organizer is recurring.</li>
+    <li><strong>"Start a Plan" CTA:</strong> Primary action button. Tapping opens the Plan creation sheet pre populated with this event.</li>
+    <li><strong>Venue section:</strong> Mini map, address, link to full venue page.</li>
+    <li><strong>Similar events:</strong> Horizontal carousel of related events based on category, venue, or artist.</li>
+  </ul>
+
+  <h4>Plan Screen</h4>
+  <p>A Plan thread is a vertically scrolled chat like interface, but it is not a freeform chat. It is a structured sequence of states:</p>
+  <ul>
+    <li>Header: Event name or "Saturday Night" with event card thumbnail.</li>
+    <li>Invite list with status indicators (going / maybe / no response).</li>
+    <li>If multiple options: voting cards displayed as a poll with tap to vote.</li>
+    <li>Once locked: logistics block (meeting time, location pin, shared ride button).</li>
+    <li>Freeform message area for coordination (limited to the Plan lifecycle).</li>
+    <li>Post event: photo grid, "Rate this night" prompt.</li>
+  </ul>
+</div>
+
+<!-- ========== 05 DESIGN LANGUAGE ========== -->
+<div class="section" id="design">
+  <div class="section-num">05 — Design Language</div>
+  <h2>Visual identity and system</h2>
+
+  <p>Pulse's design language is <strong>"warm dark."</strong> It is a dark mode first app (events happen at night; the app should feel like nighttime) but avoids the cold, sterile feel of most dark UIs. The palette uses warm off blacks, amber and coral accents, and generous use of photography and gradient overlays to create visual warmth. The overall tone is <strong>confident, curated, and alive</strong>, like a well designed music venue.</p>
+
+  <h3 id="color">Color System</h3>
+
+  <div class="swatch-row">
+    <div class="swatch-row-label">Backgrounds</div>
+    <div class="palette">
+      <div class="swatch" style="background:#0c0c0f;" data-name="#0C0C0F"></div>
+      <div class="swatch" style="background:#16161a;" data-name="#16161A"></div>
+      <div class="swatch" style="background:#1e1e24;" data-name="#1E1E24"></div>
+      <div class="swatch" style="background:#2a2a32;" data-name="#2A2A32"></div>
+    </div>
+  </div>
+  <div class="swatch-row">
+    <div class="swatch-row-label">Accent Palette</div>
+    <div class="palette">
+      <div class="swatch" style="background:#ff6b35;" data-name="Ember"></div>
+      <div class="swatch" style="background:#fb7185;" data-name="Rose"></div>
+      <div class="swatch" style="background:#2dd4bf;" data-name="Teal"></div>
+      <div class="swatch" style="background:#a78bfa;" data-name="Violet"></div>
+      <div class="swatch" style="background:#fbbf24;" data-name="Gold"></div>
+    </div>
+  </div>
+  <div class="swatch-row">
+    <div class="swatch-row-label">Text</div>
+    <div class="palette">
+      <div class="swatch" style="background:#e8e6e3; box-shadow: 0 2px 8px rgba(0,0,0,.2);" data-name="Primary"></div>
+      <div class="swatch" style="background:#9a9a9f;" data-name="Secondary"></div>
+      <div class="swatch" style="background:#5a5a62;" data-name="Tertiary"></div>
+    </div>
+  </div>
+
+  <p style="margin-top:40px;"><strong>Ember (#FF6B35)</strong> is the primary accent. It is used for CTAs, active states, the logo mark, and notification badges. It is warm, energetic, and high contrast against the dark backgrounds. It should never be used for large background fills (it becomes overwhelming); it is a spark, not a floodlight.</p>
+  <p><strong>Category colors:</strong> Each event category maps to a color from the accent palette: Music = Ember, Nightlife = Violet, Food & Drink = Gold, Arts & Culture = Rose, Sports & Outdoor = Teal. These appear as subtle gradient overlays on event cards when no image is available and as dot indicators next to category labels.</p>
+
+  <h3 id="typography">Typography</h3>
+
+  <div class="type-specimen">
+    <div class="type-row">
+      <span class="type-role">Display</span>
+      <span style="font-family:'Instrument Serif',serif; font-size:36px; font-weight:400;">Instrument Serif — 36/40</span>
+    </div>
+    <div class="type-row">
+      <span class="type-role">Heading</span>
+      <span style="font-family:'Satoshi',sans-serif; font-size:22px; font-weight:700;">Satoshi Bold — 22/28</span>
+    </div>
+    <div class="type-row">
+      <span class="type-role">Body</span>
+      <span style="font-family:'Satoshi',sans-serif; font-size:15px; font-weight:400;">Satoshi Regular — 15/24</span>
+    </div>
+    <div class="type-row">
+      <span class="type-role">Caption</span>
+      <span style="font-family:'Satoshi',sans-serif; font-size:12px; font-weight:500; color:var(--text-dim);">Satoshi Medium — 12/16</span>
+    </div>
+    <div class="type-row">
+      <span class="type-role">Mono / Label</span>
+      <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim);">IBM Plex Mono — 11/16</span>
+    </div>
+  </div>
+
+  <p><strong>Instrument Serif</strong> is used exclusively for the app name, splash screen, and high impact display moments (e.g. the "Tonight" header on the For You feed). It provides editorial warmth and contrasts with the geometric sans serif body text. <strong>Satoshi</strong> is the workhorse: used for all UI text, headings, body copy, and buttons. Its rounded geometry feels approachable without being childish. <strong>IBM Plex Mono</strong> is used for metadata, timestamps, labels, and tags: anything that should feel precise and secondary.</p>
+
+  <h3 id="motion">Motion and Interaction</h3>
+
+  <h4>Core Motion Principles</h4>
+  <ul>
+    <li><strong>Spring based animations:</strong> All transitions use spring physics (not linear or ease curves). This gives the UI a tactile, physical feel. Recommended: damping 0.8, stiffness 300 for card transitions; damping 0.6, stiffness 200 for sheet presentations.</li>
+    <li><strong>Gesture driven:</strong> Swipe right on a feed card to save. Swipe left to dismiss ("not interested," which feeds back into the recommendation engine). Long press to preview. Pull down to refresh with a custom animation (the Pulse logo "pulses").</li>
+    <li><strong>Parallax on scroll:</strong> Event card hero images have subtle parallax (0.3x scroll speed) in the feed. Event detail screen hero image has stronger parallax (0.5x) with a gradient fade to the dark background.</li>
+    <li><strong>Haptic feedback:</strong> Light impact on card save. Medium impact on RSVP confirm. Success notification haptic on ticket purchase. Haptics are essential to making the dark UI feel alive and responsive.</li>
+    <li><strong>Shared element transitions:</strong> Tapping an event card in the feed should morph the card into the detail screen using a shared element hero image transition. The card expands to fill the screen, the image scales up, and the content fades in below. This creates continuity and reduces cognitive load.</li>
+  </ul>
+
+  <h4>Micro Interactions</h4>
+  <ul>
+    <li><strong>RSVP button:</strong> On tap, the button fills with the accent color from left to right (200ms), then a subtle checkmark appears with a bounce. The friend count on the card increments in real time.</li>
+    <li><strong>Save bookmark:</strong> The bookmark icon fills with a "pour" animation from bottom to top (150ms) with a slight overshoot bounce.</li>
+    <li><strong>Plan voting:</strong> When you cast a vote, the vote count animates up and the option you selected gets a subtle glow ring (accent color, 30% opacity, pulsing).</li>
+    <li><strong>Map pins:</strong> Event pins on the map breathe (subtle scale oscillation, 0.95 to 1.05, 2 second cycle) for events happening right now. Future events have static pins.</li>
+    <li><strong>Notification badge:</strong> The Plans tab badge uses a spring scale animation when the count increments (scale from 0.5 to 1.0, slight overshoot).</li>
+  </ul>
+
+  <h3 id="components">Component System</h3>
+
+  <h4>Cards</h4>
+  <p>Cards are the primary content container. They have 14px border radius, a 1px border in the surface border color (#2A2A32), and a subtle inner shadow (inset 0 1px 0 rgba(255,255,255,0.03)) to create a slight "raised glass" effect. Cards have 0px outer shadow in the default state and a 0 4px 24px rgba(0,0,0,0.4) shadow on press/hover. Background is surface color (#16161A).</p>
+
+  <h4>Buttons</h4>
+  <ul>
+    <li><strong>Primary CTA:</strong> Full accent color fill (#FF6B35), white text, 12px border radius, 48px height, 16px horizontal padding. Satoshi Bold 15px. On press: scale to 0.97 with 100ms spring. Active state: slightly darker shade.</li>
+    <li><strong>Secondary:</strong> Transparent background, 1px accent border, accent text. Same dimensions. On press: background fills to accent at 10% opacity.</li>
+    <li><strong>Ghost:</strong> No border, text dim color, used for dismissals and secondary actions. On press: text brightens to primary.</li>
+    <li><strong>Icon buttons:</strong> 40x40px touch target (minimum), 24x24px icon. Used in the action row of event cards. On tap: scale bounce (0.85 to 1.0, spring).</li>
+  </ul>
+
+  <h4>Pills and Tags</h4>
+  <p>Pills are 28px height, 100px border radius (fully rounded), 12px horizontal padding. Background is the category color at 15% opacity, text is the category color at full opacity. Satoshi Medium 12px. Used for: date/time indicators, price tags, vibe tags, AI recommendation chips.</p>
+
+  <h4>Avatars</h4>
+  <p>Circular. Three sizes: 24px (inline with text, e.g. friend proof row), 36px (attendee strips), 56px (profile and friend list). Default placeholder: a gradient generated from the user's name hash using the accent palette. Online indicator: a 10px green dot with a 2px dark border, positioned at bottom right of the avatar.</p>
+
+  <h4>Bottom Sheet</h4>
+  <p>Used for: Plan creation, event quick preview (long press), filter panels, ticket checkout. Glassmorphism background: surface color at 85% opacity with a 24px backdrop blur. 20px top border radius. Drag handle: 36px wide, 4px tall, centered, border color, 2px border radius. Swipe down to dismiss with velocity based spring animation.</p>
+
+  <h4>Tab Bar</h4>
+  <p>Glassmorphism: background color at 70% opacity, 16px backdrop blur. Height: 84px (including safe area on iPhone). Icons are 24px, SF Symbols on iOS, Material Symbols on Android. Active state: accent color icon + 4px dot indicator below. Inactive: text dim color. Labels hidden by default for cleaner aesthetic; shown on first launch for discoverability, then hidden after 3 sessions.</p>
+</div>
+
+<!-- ========== 06 BACKEND ========== -->
+<div class="section" id="backend">
+  <div class="section-num">06 — Backend Architecture</div>
+  <h2>Technical stack and infrastructure</h2>
+
+  <div class="tech-block">
+    <div class="layer"><span class="layer-label">Client</span> React Native (Expo) · TypeScript · Reanimated 3 · React Navigation</div>
+    <div class="layer"><span class="layer-label">API</span> FastAPI (Python) · REST + WebSockets · GraphQL for social queries</div>
+    <div class="layer"><span class="layer-label">Auth</span> Firebase Auth (phone, Apple, Google) · JWT tokens · refresh rotation</div>
+    <div class="layer"><span class="layer-label">Database</span> PostgreSQL (primary) · PostGIS (geospatial) · Redis (cache + sessions)</div>
+    <div class="layer"><span class="layer-label">Search</span> Meilisearch (full text event search, typo tolerant, fast)</div>
+    <div class="layer"><span class="layer-label">Real time</span> WebSockets via FastAPI for Plans chat · Firebase Cloud Messaging for push</div>
+    <div class="layer"><span class="layer-label">Storage</span> AWS S3 (images) · CloudFront CDN · sharp for image optimization</div>
+    <div class="layer"><span class="layer-label">ML / AI</span> Python · scikit learn · sentence transformers · scheduled retraining</div>
+    <div class="layer"><span class="layer-label">Scraping</span> Scrapy + Playwright (JS rendered pages) · scheduled via Celery + Redis</div>
+    <div class="layer"><span class="layer-label">Infra</span> AWS (ECS Fargate) · Terraform · GitHub Actions CI/CD · Datadog monitoring</div>
+  </div>
+
+  <h3>Core Data Models</h3>
+
+  <table class="spec-table">
+    <tr><th>Model</th><th>Key Fields</th></tr>
+    <tr><td>User</td><td>id, phone, name, avatar_url, location (PostGIS point), taste_vector (float[128]), spotify_token, onboarding_complete, created_at</td></tr>
+    <tr><td>Event</td><td>id, title, description, venue_id, start_time, end_time, price_min, price_max, capacity, category, tags[], image_url, source (aggregated | organic), attribute_vector (float[128]), trending_score, created_at</td></tr>
+    <tr><td>Venue</td><td>id, name, location (PostGIS point), address, google_place_id, vibe_tags[], images[], claimed_by (organizer_id), created_at</td></tr>
+    <tr><td>RSVP</td><td>id, user_id, event_id, status (going | interested | not_going), created_at</td></tr>
+    <tr><td>Friendship</td><td>id, user_a_id, user_b_id, tier (inner_circle | friend | connection), created_at</td></tr>
+    <tr><td>Plan</td><td>id, creator_id, title, event_ids[], status (proposal | voting | locked | live | archived), meeting_time, meeting_location, created_at</td></tr>
+    <tr><td>PlanMember</td><td>id, plan_id, user_id, status (invited | going | maybe | declined)</td></tr>
+    <tr><td>Message</td><td>id, plan_id, user_id, body, type (text | image | system), created_at</td></tr>
+    <tr><td>TasteProfile</td><td>id, user_id, genre_weights (jsonb), category_affinities (jsonb), price_sensitivity, time_preferences (jsonb), updated_at</td></tr>
+  </table>
+
+  <h3>API Design Highlights</h3>
+  <ul>
+    <li><strong>GET /feed:</strong> Returns paginated, ranked event cards for the authenticated user. Accepts lat/lng, radius, and time_window filters. Response includes pre computed social proof (friend RSVPs) to avoid N+1 queries on the client.</li>
+    <li><strong>POST /events/:id/rsvp:</strong> Creates an RSVP and triggers real time WebSocket notifications to the user's inner circle members who have also RSVPed or saved this event.</li>
+    <li><strong>POST /plans:</strong> Creates a Plan with invited user IDs and optional event IDs. Triggers push notifications to invitees.</li>
+    <li><strong>WS /plans/:id/stream:</strong> WebSocket for real time Plan chat and status updates (voting results, lock status changes).</li>
+    <li><strong>GET /events/map:</strong> Returns events within a bounding box with clustering at zoom levels below 14. Uses PostGIS ST_ClusterDBSCAN for performant spatial grouping.</li>
+    <li><strong>POST /feedback/swipe:</strong> Records swipe direction (right = save, left = dismiss) for recommendation engine training. Batch submitted every 10 swipes to reduce API calls.</li>
+  </ul>
+</div>
+
+<!-- ========== 07 DATA / AI ========== -->
+<div class="section" id="data">
+  <div class="section-num">07 — Data and AI Pipeline</div>
+  <h2>Recommendation engine and personalization</h2>
+
+  <h3>Taste Profile Construction</h3>
+  <p>Each user has a 128 dimensional taste vector stored as a float array. This vector is constructed from multiple input signals:</p>
+  <ul>
+    <li><strong>Spotify/Apple Music:</strong> The user's top artists and genres are fetched via API. Each genre maps to a pre trained embedding. The user's music taste vector is the weighted average of their top 50 artist embeddings, with recency weighting (recent listens count more).</li>
+    <li><strong>Onboarding selections:</strong> The 5 vibe tags selected during onboarding each correspond to a pre set vector. These are averaged and blended with the music vector (50/50 at start, decaying to 20/80 as behavioral data accumulates).</li>
+    <li><strong>Behavioral signals:</strong> Every save, RSVP, dismiss, share, and attendance confirmation updates the vector via exponential moving average. Positive signals (save, RSVP) pull the vector toward the event's attribute vector. Negative signals (dismiss) push it away. The learning rate starts high (0.1) for new users and decays to 0.01 for established profiles.</li>
+    <li><strong>Social contagion:</strong> If 3+ inner circle friends attend an event category the user has not tried, the user's taste vector gets a small nudge toward that category (exploration bonus).</li>
+  </ul>
+
+  <h3>Event Attribute Vectors</h3>
+  <p>Each event also has a 128 dimensional attribute vector, generated by:</p>
+  <ul>
+    <li>Encoding the event title and description using a sentence transformer model (all MiniLM L6 v2 or similar).</li>
+    <li>Concatenating with one hot encoded category, price bucket, time of day, day of week, and venue type features.</li>
+    <li>Projecting down to 128 dimensions via a trained projection layer.</li>
+  </ul>
+  <p>The feed ranking score for a given user event pair is a weighted combination of: cosine similarity between user taste vector and event attribute vector (40%), social signal score (35%), temporal relevance decay (15%), and trending momentum (10%).</p>
+
+  <h3>Retraining Schedule</h3>
+  <ul>
+    <li><strong>User taste vectors:</strong> Updated in near real time (within 5 minutes of each behavioral signal) via a Celery background worker.</li>
+    <li><strong>Event attribute vectors:</strong> Generated on event creation and re embedded weekly to incorporate new user generated tags and attendance data.</li>
+    <li><strong>Global model weights:</strong> The projection layer and ranking weight coefficients are retrained weekly on a full behavioral dataset using an offline batch job.</li>
+    <li><strong>Cold start handling:</strong> New users with no behavioral data get a "popular in your area" baseline feed. Connecting Spotify immediately upgrades this to a music taste based feed. Within 5 to 10 interactions, the behavioral model takes over.</li>
+  </ul>
+
+  <div class="callout violet">
+    <h5>Privacy by design</h5>
+    <p>Taste vectors are abstract numerical representations. They cannot be reverse engineered into specific behavioral data. Raw Spotify data is processed and discarded; only the derived vector is stored. Users can view a human readable summary of their taste profile ("You lean toward: live music, late night, small venues, $10 to $30 range") and adjust it manually. All social features (inner circle visibility, attendance visibility) are granularly controllable in settings.</p>
+  </div>
+</div>
+
+<!-- ========== 08 GROWTH ========== -->
+<div class="section" id="growth">
+  <div class="section-num">08 — Growth and Monetization</div>
+  <h2>How Pulse grows and makes money</h2>
+
+  <h3>Growth Loops</h3>
+  <ul>
+    <li><strong>Plan invites (primary loop):</strong> User A creates a Plan and invites Users B, C, D. If B, C, D are not on Pulse, they receive an SMS with a deep link: "Alex invited you to Jazz at the Promontory on Saturday. Tap to join the plan." This is the single most important acquisition channel. Every Plan is a potential 3 to 5 person acquisition event.</li>
+    <li><strong>Attendance sharing:</strong> After confirming RSVP, users are prompted to share to their Instagram story with a branded Pulse card (event image + "Going with @friend1 @friend2" + QR code to the event on Pulse). The share template should be visually attractive enough that users want to post it.</li>
+    <li><strong>Friend of friend discovery:</strong> When you attend an event, Pulse shows you who else was there among your extended network. "You and Jordan were both at Reggae Night. Add Jordan?" This converts single attendance events into ongoing social connections.</li>
+    <li><strong>Campus ambassador program:</strong> At launch (Chicago), recruit 10 to 15 student ambassadors per campus. Each ambassador gets a unique referral code, a budget for hosting one Pulse branded event per month, and a small stipend. Their job is to seed the supply side (list campus events) and demand side (get their social circle on the app).</li>
+  </ul>
+
+  <h3>Monetization (Phased)</h3>
+
+  <table class="spec-table">
+    <tr><th>Phase</th><th>Revenue Stream</th><th>Details</th></tr>
+    <tr><td>Phase 1 (0 to 12 months)</td><td>None (growth mode)</td><td>All features free. Zero organizer fees. Maximize supply and demand side adoption. Funded by seed capital.</td></tr>
+    <tr><td>Phase 2 (12 to 24 months)</td><td>Promoted Events</td><td>Organizers pay to boost events in the For You feed. CPM ($8 to $15) or CPC ($0.50 to $2.00) model. Self serve dashboard. Targeting by location, age, and taste cluster.</td></tr>
+    <tr><td>Phase 2</td><td>Pulse Pro (Organizer SaaS)</td><td>$29/mo tier with advanced analytics, CRM, automated post event surveys, and priority support. Free tier remains for basic listing.</td></tr>
+    <tr><td>Phase 3 (24+ months)</td><td>Ticketing Commission</td><td>2% + $0.50 per paid ticket (significantly below Eventbrite's 10 to 14%). Only introduced once sufficient demand side scale makes the commission justified by volume.</td></tr>
+    <tr><td>Phase 3</td><td>Pulse+ (Consumer Sub)</td><td>$4.99/mo. Unlocks: expanded Pulse Match radius, priority event access for popular/capped events, ad free feed, and exclusive "Pulse Picks" curated lists.</td></tr>
+  </table>
+
+  <h3>Key Metrics to Track</h3>
+  <ul>
+    <li><strong>North star:</strong> Weekly active Plans created (measures both discovery and social engagement simultaneously).</li>
+    <li><strong>Activation:</strong> % of signups who RSVP to at least one event within 7 days.</li>
+    <li><strong>Retention:</strong> D7, D14, D30 retention. Target: 40% D7 (strong for social apps).</li>
+    <li><strong>Viral coefficient:</strong> Average Plan invites sent per active user per week × invite to signup conversion rate. Target: k > 1.0.</li>
+    <li><strong>Supply health:</strong> Events listed per week per zip code. Minimum viable density: 20 events/week in the launch geo.</li>
+    <li><strong>Feed engagement:</strong> Cards viewed per session, save rate, RSVP rate, swipe left rate (inversely correlated with recommendation quality).</li>
+  </ul>
+</div>
+
+<!-- ========== 09 LAUNCH ========== -->
+<div class="section" id="launch">
+  <div class="section-num">09 — Launch Strategy</div>
+  <h2>Chicago first, then scale</h2>
+
+  <p><strong>Launch geography: Chicago, starting with Hyde Park and the South Loop corridor.</strong> The University of Chicago campus provides a dense, socially connected user base with high event density (campus organizations, bar events, concerts, art shows). The surrounding neighborhoods (Woodlawn, Kenwood, Bronzeville, South Loop) extend the map naturally as users explore beyond campus.</p>
+
+  <h3>Pre Launch (8 weeks before)</h3>
+  <ul>
+    <li>Seed the event database by scraping UChicago event calendars, Chicago Reader, Do312, Eventbrite Chicago, and venue websites for Hyde Park, South Loop, and the Loop.</li>
+    <li>Recruit 10 to 15 campus ambassadors across UChicago, IIT, Columbia College, and UIC.</li>
+    <li>Launch an Instagram account with a "What's happening in Chicago tonight" content series (repurposing the event data to build audience before the app launches).</li>
+    <li>Collect a waitlist via a simple landing page. Offer early access + lifetime Pulse+ to the first 500 signups.</li>
+  </ul>
+
+  <h3>Launch Week</h3>
+  <ul>
+    <li>Host 3 Pulse branded events in Hyde Park (a DJ set, a comedy show, and a free food/drink social). These events are the first "Plans" and the social proof that seeds the platform.</li>
+    <li>Activate ambassadors: each hosts a "download Pulse" event for their social circle.</li>
+    <li>Target: 1,000 users in the first week, 200 weekly active Plans by end of month 1.</li>
+  </ul>
+
+  <h3>Expansion Playbook (Month 3 to 12)</h3>
+  <ul>
+    <li>Expand geo from Hyde Park to all of Chicago (Lincoln Park, Wicker Park, Logan Square, West Loop, Pilsen).</li>
+    <li>Replicate campus ambassador model at Northwestern, Loyola, and DePaul.</li>
+    <li>If Chicago metrics hit targets (40% D7 retention, k > 0.8 viral coefficient), begin expansion to second city. Candidate cities: Ann Arbor, Madison, or Austin (college towns with strong event cultures and dense social graphs).</li>
+  </ul>
+
+  <div class="callout">
+    <h5>The long term vision</h5>
+    <p>Pulse is not an events app. It is a social layer for real life. The events are the wedge, but the enduring value is the social graph of people who go out together. Over time, Pulse expands from events to all real life social coordination: restaurant reservations with friends, weekend trip planning, recurring activity groups. The "Plan" becomes the universal unit of doing things together in real life.</p>
+  </div>
+</div>
+
+<hr>
+
+<footer style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-dim); padding-top:16px;">
+  Pulse Product Specification v1.0 · April 2026 · Prepared for internal design and engineering reference.
+</footer>
+
+</div>
+</body>
+</html>
