@@ -30,7 +30,7 @@ final class APIService: ObservableObject {
     static let shared = APIService()
 
     // Change to your machine's IP when testing on device, or localhost for simulator
-    private let baseURL = "http://10.150.119.91:8000"
+    private let baseURL = "https://frnd-production.up.railway.app"
     private var authToken: String? {
         get { UserDefaults.standard.string(forKey: "auth_token") }
         set { UserDefaults.standard.set(newValue, forKey: "auth_token") }

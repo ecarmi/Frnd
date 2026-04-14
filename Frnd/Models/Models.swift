@@ -203,10 +203,10 @@ struct TasteProfile: Codable {
 }
 
 struct TimePreferences: Codable {
-    let weekdayEvening: Double
-    let fridayNight: Double
-    let saturdayNight: Double
-    let sundayAfternoon: Double
+    let weekdayEvening: Double?
+    let fridayNight: Double?
+    let saturdayNight: Double?
+    let sundayAfternoon: Double?
 
     enum CodingKeys: String, CodingKey {
         case weekdayEvening   = "weekday_evening"

@@ -78,10 +78,6 @@ struct OnboardingView: View {
             defer { isLoading = false }
             do {
                 try await APIService.shared.requestEmailOTP(email: trimmed)
-                if trimmed == devBypassEmail {
-                    isDevMode = true
-                    errorMessage = "Dev mode — use code 000000"
-                }
                 withAnimation { step = .otp }
             } catch {
                 // Backend unreachable — fall back to dev mode in DEBUG

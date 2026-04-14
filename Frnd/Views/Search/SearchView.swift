@@ -120,6 +120,9 @@ struct SearchView: View {
                 }
             }
             .task { await viewModel.loadTrending() }
+            .sheet(item: $showEventDetail) { event in
+                EventDetailView(event: event)
+            }
         }
     }
 
@@ -208,9 +211,6 @@ struct SearchView: View {
                     .padding(.horizontal, Spacing.base)
                 }
             }
-        }
-        .sheet(item: $showEventDetail) { event in
-            EventDetailView(event: event)
         }
     }
 
