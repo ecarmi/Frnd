@@ -48,8 +48,8 @@ async def _load_carpool(carpool_id: str, db: AsyncSession) -> Carpool | None:
     result = await db.execute(
         select(Carpool)
         .options(
-            selectinload(Carpool.driver),
-            selectinload(Carpool.passengers).selectinload(CarpoolPassenger.user),
+            selectinload(Carpool.driver).selectinload(User.taste_profile),
+            selectinload(Carpool.passengers).selectinload(CarpoolPassenger.user).selectinload(User.taste_profile),
         )
         .where(Carpool.id == carpool_id)
     )
@@ -65,8 +65,8 @@ async def list_plan_carpools(
     result = await db.execute(
         select(Carpool)
         .options(
-            selectinload(Carpool.driver),
-            selectinload(Carpool.passengers).selectinload(CarpoolPassenger.user),
+            selectinload(Carpool.driver).selectinload(User.taste_profile),
+            selectinload(Carpool.passengers).selectinload(CarpoolPassenger.user).selectinload(User.taste_profile),
         )
         .where(Carpool.plan_id == plan_id)
         .order_by(Carpool.created_at.asc())

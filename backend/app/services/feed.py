@@ -77,7 +77,7 @@ async def social_score(
     going = []
     interested = []
     for rsvp in friend_rsvps:
-        u_result = await db.execute(select(User).where(User.id == rsvp.user_id))
+        u_result = await db.execute(select(User).where(User.id == rsvp.user_id).options(selectinload(User.taste_profile)))
         u = u_result.scalar_one_or_none()
         if not u:
             continue

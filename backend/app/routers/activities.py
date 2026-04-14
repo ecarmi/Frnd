@@ -49,8 +49,8 @@ async def _load_post(post_id: str, db: AsyncSession) -> ActivityPost | None:
     result = await db.execute(
         select(ActivityPost)
         .options(
-            selectinload(ActivityPost.creator),
-            selectinload(ActivityPost.participants).selectinload(ActivityParticipant.user),
+            selectinload(ActivityPost.creator).selectinload(User.taste_profile),
+            selectinload(ActivityPost.participants).selectinload(ActivityParticipant.user).selectinload(User.taste_profile),
         )
         .where(ActivityPost.id == post_id)
     )
@@ -66,8 +66,8 @@ async def list_activities(
     q = (
         select(ActivityPost)
         .options(
-            selectinload(ActivityPost.creator),
-            selectinload(ActivityPost.participants).selectinload(ActivityParticipant.user),
+            selectinload(ActivityPost.creator).selectinload(User.taste_profile),
+            selectinload(ActivityPost.participants).selectinload(ActivityParticipant.user).selectinload(User.taste_profile),
         )
         .where(ActivityPost.status == ActivityStatusEnum.open)
         .order_by(ActivityPost.scheduled_time.asc())

@@ -100,7 +100,7 @@ async def get_friends(
     out = []
     for f in friendships:
         other_id = f.user_b_id if f.user_a_id == current_user.id else f.user_a_id
-        other_result = await db.execute(select(User).where(User.id == other_id))
+        other_result = await db.execute(select(User).where(User.id == other_id).options(selectinload(User.taste_profile)))
         other = other_result.scalar_one_or_none()
         item = FriendshipOut.model_validate(f)
         item.other_user = UserOut.model_validate(other) if other else None
