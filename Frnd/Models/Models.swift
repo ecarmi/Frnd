@@ -259,7 +259,8 @@ struct Event: Codable, Identifiable {
     let category: EventCategory
     let tags: [String]
     let imageURL: String?
-    let source: String       // "aggregated" | "organic"
+    let source: String       // "aggregated" | "organic" | "user_created"
+    let creatorId: String?  = nil
     let trendingScore: Double
 
     // Feed-specific extras (injected by the feed endpoint)
@@ -292,6 +293,7 @@ struct Event: Codable, Identifiable {
         case capacity, category, tags
         case imageURL     = "image_url"
         case source
+        case creatorId     = "creator_id"
         case trendingScore = "trending_score"
         case friendsGoing     = "friends_going"
         case friendsInterested = "friends_interested"

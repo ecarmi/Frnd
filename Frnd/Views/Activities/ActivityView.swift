@@ -73,8 +73,7 @@ struct ActivityFeedView: View {
                     Button {
                         showCreate = true
                     } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 22))
+                        Image(systemName: "plus")
                             .foregroundColor(.ember)
                     }
                 }

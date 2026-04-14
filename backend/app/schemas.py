@@ -113,6 +113,7 @@ class EventOut(OrmBase):
     tags: list[str] = []
     image_url: Optional[str] = None
     source: str
+    creator_id: Optional[str] = None
     trending_score: float
     # Feed extras
     friends_going: list[UserOut] = []
@@ -123,10 +124,18 @@ class EventOut(OrmBase):
     is_saved: bool = False
 
 
+class VenueCreate(BaseModel):
+    name: str
+    address: str
+    latitude: float
+    longitude: float
+
+
 class EventCreate(BaseModel):
     title: str
     description: str = ""
-    venue_id: str
+    venue_id: Optional[str] = None    # use existing venue
+    venue: Optional[VenueCreate] = None  # or create inline
     start_time: datetime
     end_time: Optional[datetime] = None
     price_min: Optional[float] = None
@@ -135,6 +144,7 @@ class EventCreate(BaseModel):
     category: EventCategoryEnum = EventCategoryEnum.other
     tags: list[str] = []
     image_url: Optional[str] = None
+    group_id: Optional[str] = None
 
 
 class FeedResponse(BaseModel):

@@ -146,3 +146,18 @@ async def get_attended_events(
     )
     events = result.scalars().all()
     return [await build_feed_event_out(e, current_user, db) for e in events]
+
+
+@router.get("/me/events", response_model=list[EventOut])
+async def get_my_created_events(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Event)
+        .options(selectinload(Event.venue))
+        .where(Event.creator_id == current_user.id)
+        .order_by(Event.start_time.desc())
+    )
+    events = result.scalars().all()
+    return [await build_feed_event_out(e, current_user, db) for e in events]

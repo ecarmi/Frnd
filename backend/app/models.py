@@ -181,6 +181,7 @@ class Event(Base):
     tags: Mapped[list]      = mapped_column(JSON, default=list)
     image_url: Mapped[Optional[str]] = mapped_column(String(500))
     source: Mapped[str]     = mapped_column(String(50), default="organic")
+    creator_id: Mapped[Optional[str]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     # 128-dim attribute vector
     attribute_vector: Mapped[Optional[list]] = mapped_column(JSON)
     trending_score: Mapped[float] = mapped_column(Float, default=0.0)

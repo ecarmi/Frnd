@@ -269,6 +269,41 @@ final class APIService: ObservableObject {
         try await request(path: "/users/me/attended")
     }
 
+    func fetchMyCreatedEvents() async throws -> [Event] {
+        try await request(path: "/users/me/events")
+    }
+
+    // MARK: - Create / Delete Events
+
+    struct CreateEventBody: Encodable {
+        struct VenueBody: Encodable {
+            let name: String
+            let address: String
+            let latitude: Double
+            let longitude: Double
+        }
+        let title: String
+        let description: String
+        let venue: VenueBody
+        let start_time: Date
+        let end_time: Date?
+        let price_min: Double?
+        let price_max: Double?
+        let capacity: Int?
+        let category: EventCategory
+        let tags: [String]
+        let group_id: String?
+    }
+
+    func createEvent(_ body: CreateEventBody) async throws -> Event {
+        try await request(path: "/events", method: "POST", body: body)
+    }
+
+    func deleteEvent(id: String) async throws {
+        struct Empty: Codable {}
+        let _: Empty = try await request(path: "/events/\(id)", method: "DELETE")
+    }
+
     func completeOnboarding(vibeTagNames: [String]) async throws -> User {
         struct OnboardingBody: Encodable { let vibe_tag_names: [String] }
         return try await request(

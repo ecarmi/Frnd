@@ -7,6 +7,7 @@ import CoreLocation
 final class ProfileViewModel: ObservableObject {
     @Published var savedEvents: [Event] = []
     @Published var attendedEvents: [Event] = []
+    @Published var myEvents: [Event] = []
     @Published var friends: [Friendship] = []
     @Published var isLoading = false
 
@@ -16,9 +17,11 @@ final class ProfileViewModel: ObservableObject {
         async let friendsResult = try? APIService.shared.fetchFriends()
         async let savedResult = try? APIService.shared.fetchSavedEvents()
         async let attendedResult = try? APIService.shared.fetchAttendedEvents()
+        async let myEventsResult = try? APIService.shared.fetchMyCreatedEvents()
         friends = (await friendsResult) ?? []
         savedEvents = (await savedResult) ?? []
         attendedEvents = (await attendedResult) ?? []
+        myEvents = (await myEventsResult) ?? []
     }
 }
 
@@ -32,6 +35,7 @@ struct ProfileView: View {
     enum ProfileTab: String, CaseIterable {
         case saved    = "Saved"
         case attended = "Attended"
+        case myEvents = "My Events"
         case friends  = "Friends"
     }
 
@@ -230,6 +234,28 @@ struct ProfileView: View {
                         ForEach(viewModel.attendedEvents) { event in
                             SearchResultRow(event: event)
                                 .padding(.horizontal, Spacing.base)
+                        }
+                    }
+                    .padding(.top, Spacing.md)
+                }
+            case .myEvents:
+                if viewModel.myEvents.isEmpty {
+                    emptyTabState(icon: "calendar.badge.plus", message: "Events you post will appear here")
+                } else {
+                    LazyVStack(spacing: Spacing.sm) {
+                        ForEach(viewModel.myEvents) { event in
+                            SearchResultRow(event: event)
+                                .padding(.horizontal, Spacing.base)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        Task {
+                                            try? await APIService.shared.deleteEvent(id: event.id)
+                                            viewModel.myEvents.removeAll { $0.id == event.id }
+                                        }
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
                         }
                     }
                     .padding(.top, Spacing.md)

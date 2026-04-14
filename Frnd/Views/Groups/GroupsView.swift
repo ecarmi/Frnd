@@ -69,10 +69,8 @@ struct GroupsView: View {
                         Button("Create Group") { showCreate = true }
                         Button("Join via Code") { showJoin = true }
                     } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 22))
+                        Image(systemName: "plus")
                             .foregroundColor(.ember)
-                            .frame(width: 28, height: 28)
                     }
                 }
             }
@@ -183,6 +181,7 @@ struct GroupDetailView: View {
     @State private var activities: [ActivityPost] = []
     @State private var loadingActivities = false
     @State private var showCreateActivity = false
+    @State private var showCreateEvent = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -216,6 +215,7 @@ struct GroupDetailView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    Button("Post Event") { showCreateEvent = true }
                     Button("Post Activity") { showCreateActivity = true }
                     Button("Leave Group", role: .destructive) {
                         Task {
@@ -228,6 +228,9 @@ struct GroupDetailView: View {
                         .foregroundColor(.textSecondary)
                 }
             }
+        }
+        .sheet(isPresented: $showCreateEvent) {
+            CreateEventView(groupId: group.id)
         }
         .sheet(isPresented: $showCreateActivity) {
             CreateActivityView(groupId: group.id) { post in

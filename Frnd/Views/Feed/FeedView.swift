@@ -3,6 +3,7 @@ import SwiftUI
 struct FeedView: View {
     @StateObject private var viewModel = FeedViewModel()
     @State private var selectedFilter: TimeFilter = .all
+    @State private var showCreateEvent = false
 
     enum TimeFilter: String, CaseIterable {
         case all     = "All"
@@ -59,13 +60,26 @@ struct FeedView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task { await viewModel.loadFeed(refresh: true) }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundColor(.textSecondary)
+                    HStack(spacing: Spacing.md) {
+                        Button {
+                            showCreateEvent = true
+                        } label: {
+                            Image(systemName: "plus")
+                                .foregroundColor(.ember)
+                        }
+                        Button {
+                            Task { await viewModel.loadFeed(refresh: true) }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundColor(.textSecondary)
+                        }
                     }
                 }
+            }
+        }
+        .sheet(isPresented: $showCreateEvent) {
+            CreateEventView(groupId: nil) { newEvent in
+                viewModel.events.insert(newEvent, at: 0)
             }
         }
         .task {

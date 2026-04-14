@@ -73,20 +73,61 @@ async def create_event(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    venue_result = await db.execute(select(Venue).where(Venue.id == body.venue_id))
-    if not venue_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Venue not found")
+    if not body.venue_id and not body.venue:
+        raise HTTPException(status_code=400, detail="Provide either venue_id or venue details")
 
-    event = Event(**body.model_dump())
+    if body.venue_id:
+        venue_result = await db.execute(select(Venue).where(Venue.id == body.venue_id))
+        if not venue_result.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail="Venue not found")
+        venue_id = body.venue_id
+    else:
+        v = body.venue
+        venue = Venue(name=v.name, address=v.address, latitude=v.latitude, longitude=v.longitude)
+        db.add(venue)
+        await db.flush()
+        venue_id = venue.id
+
+    event = Event(
+        title=body.title,
+        description=body.description,
+        venue_id=venue_id,
+        start_time=body.start_time,
+        end_time=body.end_time,
+        price_min=body.price_min,
+        price_max=body.price_max,
+        capacity=body.capacity,
+        category=body.category,
+        tags=body.tags,
+        image_url=body.image_url,
+        group_id=body.group_id,
+        source="user_created",
+        creator_id=current_user.id,
+    )
     db.add(event)
     await db.commit()
-    await db.refresh(event)
 
     result = await db.execute(
         select(Event).options(selectinload(Event.venue)).where(Event.id == event.id)
     )
     event = result.scalar_one()
     return await build_feed_event_out(event, current_user, db)
+
+
+@router.delete("/{event_id}", status_code=204)
+async def delete_event(
+    event_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Event).where(Event.id == event_id))
+    event = result.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event.creator_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only delete your own events")
+    await db.delete(event)
+    await db.commit()
 
 
 @router.post("/{event_id}/rsvp", response_model=RSVPOut)

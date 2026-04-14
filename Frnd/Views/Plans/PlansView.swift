@@ -74,8 +74,7 @@ struct PlansView: View {
                     Button {
                         if selectedSegment == 0 { showCreatePlan = true }
                     } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 22))
+                        Image(systemName: "plus")
                             .foregroundColor(.ember)
                             .opacity(selectedSegment == 0 ? 1 : 0)
                     }
@@ -308,8 +307,8 @@ struct GroupsViewEmbedded: View {
                     Button("Create Group") { showCreate = true }
                     Button("Join via Code") { showJoin = true }
                 } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 22)).foregroundColor(.ember)
+                    Image(systemName: "plus")
+                        .foregroundColor(.ember)
                 }
             }
         }
@@ -359,8 +358,8 @@ struct ActivityFeedViewEmbedded: View {
                 Button {
                     showCreate = true
                 } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 22)).foregroundColor(.ember)
+                    Image(systemName: "plus")
+                        .foregroundColor(.ember)
                 }
             }
         }
