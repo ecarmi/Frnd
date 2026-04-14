@@ -4,48 +4,29 @@ struct EventCardView: View {
     let event: Event
     let onSave: () -> Void
     let onRSVP: () -> Void
-    let onSwipeLeft: () -> Void
-    let onSwipeRight: () -> Void
 
-    @State private var dragOffset: CGSize = .zero
-    @State private var cardRotation: Double = 0
     @State private var showDetail = false
 
-    private let swipeThreshold: CGFloat = 80
-
     var body: some View {
-        ZStack(alignment: .top) {
-            // Background card (gives slight depth)
-            cardContent
-                .offset(x: dragOffset.width, y: dragOffset.height * 0.2)
-                .rotationEffect(.degrees(cardRotation))
-                .gesture(swipeGesture)
-                .onTapGesture { showDetail = true }
-
-            // Swipe overlays
-            swipeOverlays
-        }
-        .sheet(isPresented: $showDetail) {
-            EventDetailView(event: event)
-        }
+        cardContent
+            .onTapGesture { showDetail = true }
+            .sheet(isPresented: $showDetail) {
+                EventDetailView(event: event)
+            }
     }
 
     // MARK: - Card Content
 
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Hero image / gradient
             heroSection
 
-            // Info section
             VStack(alignment: .leading, spacing: Spacing.md) {
-                // Title
                 Text(event.title)
                     .font(.headingMedium)
                     .foregroundColor(.textPrimary)
                     .lineLimit(2)
 
-                // Venue + distance
                 HStack(spacing: Spacing.xs) {
                     Image(systemName: "mappin.fill")
                         .font(.captionSmall)
@@ -53,24 +34,16 @@ struct EventCardView: View {
                     Text(event.venue.name)
                         .font(.captionMedium)
                         .foregroundColor(.textSecondary)
-                    Text("·")
-                        .foregroundColor(.textTertiary)
-                    Text("0.8 mi")
-                        .font(.captionMedium)
-                        .foregroundColor(.textSecondary)
                 }
 
-                // Pill row
                 HStack(spacing: Spacing.sm) {
                     PillView(text: event.startTime.relativeEventTime, color: .ember)
                     PillView(text: event.priceDisplay, color: event.isFree ? .teal : .textSecondary)
                     Spacer()
                 }
 
-                // Social proof row
                 socialProofRow
 
-                // AI Reason chip
                 if let reason = event.aiReasonChip {
                     HStack(spacing: 6) {
                         Image(systemName: "sparkles")
@@ -82,10 +55,8 @@ struct EventCardView: View {
                     }
                 }
 
-                Divider()
-                    .overlay(Color.bgBorder)
+                Divider().overlay(Color.bgBorder)
 
-                // Action row
                 actionRow
             }
             .padding(Spacing.base)
@@ -109,26 +80,19 @@ struct EventCardView: View {
                     )
                 )
 
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Text(event.category.emoji)
-                        .font(.system(size: 72))
-                        .opacity(0.8)
-                    Spacer()
-                }
-                Spacer()
-            }
+            Text(event.category.emoji)
+                .font(.system(size: 72))
+                .opacity(0.8)
 
-            // Category label
-            HStack {
-                PillView(text: event.category.displayName, color: Color.categoryColor(for: event.category))
-                    .padding(12)
+            VStack(alignment: .leading) {
+                CategoryLabel(text: event.category.displayName,
+                              color: Color.categoryColor(for: event.category))
+                    .padding(.leading, 14)
+                    .padding(.top, 14)
                 Spacer()
             }
         }
-        .frame(height: 200)
+        .frame(height: 180)
         .clipShape(
             UnevenRoundedRectangle(
                 topLeadingRadius: Radius.lg, bottomLeadingRadius: 0,
@@ -148,11 +112,11 @@ struct EventCardView: View {
                             .overlay(Circle().strokeBorder(Color.bgSurface, lineWidth: 1.5))
                     }
                 }
-                let names = event.friendsGoing.prefix(2).map {
-                    $0.name.components(separatedBy: " ").first ?? $0.name
-                }.joined(separator: ", ")
+                let names = event.friendsGoing.prefix(2)
+                    .map { $0.name.components(separatedBy: " ").first ?? $0.name }
+                    .joined(separator: ", ")
                 let extra = max(0, event.friendsGoing.count - 2)
-                let label = extra > 0 ? "\(names) + \(extra) going" : "\(names) going"
+                let label = extra > 0 ? "\(names) +\(extra) going" : "\(names) going"
                 Text(label)
                     .font(.captionMedium)
                     .foregroundColor(.textSecondary)
@@ -172,24 +136,21 @@ struct EventCardView: View {
 
     private var actionRow: some View {
         HStack(spacing: 0) {
-            // Save
             ActionButton(
                 icon: event.isSaved ? "bookmark.fill" : "bookmark",
                 color: event.isSaved ? .ember : .textTertiary,
                 action: onSave
             )
             Spacer()
-            // Share
-            ActionButton(icon: "paperplane", color: .textTertiary) {
-                // Share sheet
-            }
+            ActionButton(icon: "paperplane", color: .textTertiary) {}
             Spacer()
-            // RSVP
             Button(action: onRSVP) {
                 HStack(spacing: 6) {
                     Image(systemName: event.userRSVPStatus == .going ? "checkmark" : "ticket.fill")
                         .font(.system(size: 14, weight: .bold))
-                    Text(event.userRSVPStatus == .going ? "Going" : (event.isFree ? "RSVP" : "Get Tickets"))
+                    Text(event.userRSVPStatus == .going
+                         ? "Going"
+                         : (event.isFree ? "RSVP" : "Get Tickets"))
                         .font(.captionMedium)
                 }
                 .foregroundColor(.white)
@@ -200,76 +161,23 @@ struct EventCardView: View {
             }
         }
     }
+}
 
-    // MARK: - Swipe Overlays
+// MARK: - Category Label (rectangular, fits text)
 
-    private var swipeOverlays: some View {
-        ZStack {
-            // Dismiss overlay (swipe left)
-            if dragOffset.width < -20 {
-                HStack {
-                    Spacer()
-                    VStack {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundColor(.rose)
-                        Text("Not for me")
-                            .font(.captionMedium)
-                            .foregroundColor(.rose)
-                    }
-                    .padding(20)
-                    .opacity(min(1.0, abs(dragOffset.width) / swipeThreshold))
-                }
-            }
+private struct CategoryLabel: View {
+    let text: String
+    let color: Color
 
-            // Save overlay (swipe right)
-            if dragOffset.width > 20 {
-                HStack {
-                    VStack {
-                        Image(systemName: "bookmark.fill")
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundColor(.teal)
-                        Text("Saved")
-                            .font(.captionMedium)
-                            .foregroundColor(.teal)
-                    }
-                    .padding(20)
-                    .opacity(min(1.0, dragOffset.width / swipeThreshold))
-                    Spacer()
-                }
-            }
-        }
-    }
-
-    // MARK: - Swipe Gesture
-
-    private var swipeGesture: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                dragOffset = value.translation
-                cardRotation = Double(value.translation.width / 20)
-            }
-            .onEnded { value in
-                let width = value.translation.width
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    if width < -swipeThreshold {
-                        // Swipe left - dismiss
-                        dragOffset = CGSize(width: -500, height: 0)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            onSwipeLeft()
-                        }
-                    } else if width > swipeThreshold {
-                        // Swipe right - save
-                        dragOffset = CGSize(width: 500, height: 0)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            onSwipeRight()
-                        }
-                    } else {
-                        dragOffset = .zero
-                        cardRotation = 0
-                    }
-                }
-            }
+    var body: some View {
+        Text(text)
+            .font(.captionSmall)
+            .foregroundColor(color)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(color.opacity(0.18))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(color.opacity(0.4), lineWidth: 0.5))
     }
 }
 

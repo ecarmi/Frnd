@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan — Product Specification Document</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=General+Sans:wght@400;500;600;700&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --surface-alt: #f2efe9;
+  --border: #e4e0d8;
+  --ink: #1c1917;
+  --ink-dim: #78716c;
+  --ink-faint: #a8a29e;
+  --orange: #e85d04;
+  --orange-light: #e85d0412;
+  --blue: #2563eb;
+  --blue-light: #2563eb10;
+  --green: #16a34a;
+  --green-light: #16a34a10;
+  --purple: #7c3aed;
+  --purple-light: #7c3aed10;
+  --rose: #e11d48;
+  --rose-light: #e11d4810;
+  --amber: #d97706;
+  --amber-light: #d9770610;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'General Sans', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.75;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Layout */
+.page { max-width: 820px; margin: 0 auto; padding: 40px 24px 120px; }
+@media(min-width:1200px) {
+  .sidebar {
+    display: block; position: fixed; left: 0; top: 0; width: 240px; height: 100vh;
+    background: var(--surface); border-right: 1px solid var(--border);
+    padding: 32px 16px; overflow-y: auto; z-index: 100;
+  }
+  .page { margin-left: 240px; padding: 40px 48px 120px 56px; }
+}
+.sidebar { display: none; }
+.sidebar .brand {
+  font-family: 'Fraunces', serif; font-size: 22px; font-weight: 700;
+  color: var(--orange); margin-bottom: 24px;
+}
+.sidebar a {
+  display: block; color: var(--ink-dim); text-decoration: none;
+  font-size: 13px; font-weight: 500; padding: 5px 0; transition: color .15s;
+}
+.sidebar a:hover { color: var(--orange); }
+.sidebar a.indent { padding-left: 14px; font-size: 12px; font-weight: 400; }
+.sidebar .sep { border-top: 1px solid var(--border); margin: 12px 0; }
+
+/* ---- HERO ---- */
+.hero {
+  padding: 56px 0 44px;
+  border-bottom: 2px solid var(--ink);
+  margin-bottom: 56px;
+}
+.hero .kicker {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase;
+  color: var(--orange); margin-bottom: 16px;
+}
+.hero h1 {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(36px, 5.5vw, 56px); font-weight: 700; line-height: 1.08;
+  margin-bottom: 18px;
+}
+.hero h1 span { color: var(--orange); }
+.hero .sub { font-size: 17px; color: var(--ink-dim); max-width: 580px; line-height: 1.65; }
+.hero .chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
+.hero .chip {
+  font-family: 'Azeret Mono', monospace; font-size: 10px;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  padding: 5px 14px; border-radius: 100px;
+  border: 1px solid var(--border); color: var(--ink-dim);
+  background: var(--surface);
+}
+
+/* ---- SECTIONS ---- */
+.s { margin-bottom: 60px; }
+.s-num {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--orange); margin-bottom: 6px;
+}
+.s h2 {
+  font-family: 'Fraunces', serif;
+  font-size: 28px; font-weight: 700; line-height: 1.2; margin-bottom: 18px;
+}
+.s h3 { font-size: 17px; font-weight: 700; margin: 30px 0 10px; }
+.s h4 {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+  margin: 24px 0 8px;
+}
+.s h4.blue { color: var(--blue); }
+.s h4.green { color: var(--green); }
+.s h4.purple { color: var(--purple); }
+.s h4.rose { color: var(--rose); }
+.s h4.amber { color: var(--amber); }
+.s h4.orange { color: var(--orange); }
+.s p { color: #44403c; margin-bottom: 14px; }
+.s p strong { color: var(--ink); font-weight: 600; }
+
+/* ---- CARDS GRID ---- */
+.grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap: 14px; margin: 20px 0; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 22px; position: relative;
+}
+.card:hover { border-color: var(--orange); }
+.card .ico { font-size: 26px; margin-bottom: 10px; }
+.card h5 { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.card p { font-size: 13px; color: var(--ink-dim); margin: 0; line-height: 1.55; }
+.card .badge {
+  position: absolute; top: 14px; right: 14px;
+  font-family: 'Azeret Mono', monospace; font-size: 9px;
+  letter-spacing: 1px; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 4px;
+}
+.badge.core { background: var(--orange-light); color: var(--orange); }
+.badge.social { background: var(--purple-light); color: var(--purple); }
+.badge.ai { background: var(--blue-light); color: var(--blue); }
+.badge.campus { background: var(--green-light); color: var(--green); }
+.badge.growth { background: var(--amber-light); color: var(--amber); }
+
+/* ---- TABLE ---- */
+.tbl { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14px; }
+.tbl th {
+  text-align: left; padding: 10px 14px;
+  font-family: 'Azeret Mono', monospace; font-size: 10px;
+  letter-spacing: 1px; text-transform: uppercase; color: var(--orange);
+  border-bottom: 2px solid var(--orange); background: var(--surface-alt);
+}
+.tbl td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.tbl td:first-child { font-weight: 600; white-space: nowrap; }
+.tbl tr:last-child td { border-bottom: none; }
+
+/* ---- CALLOUT ---- */
+.co {
+  border-left: 3px solid var(--orange); padding: 18px 22px;
+  background: var(--orange-light); border-radius: 0 10px 10px 0; margin: 24px 0;
+}
+.co.blue { border-left-color: var(--blue); background: var(--blue-light); }
+.co.green { border-left-color: var(--green); background: var(--green-light); }
+.co.purple { border-left-color: var(--purple); background: var(--purple-light); }
+.co h5 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.co p { font-size: 14px; color: #44403c; margin: 0; }
+
+/* ---- TECH BLOCK ---- */
+.tech {
+  background: var(--ink); color: #d6d3d1; border-radius: 10px;
+  padding: 22px 26px; margin: 18px 0;
+  font-family: 'Azeret Mono', monospace; font-size: 12.5px; line-height: 1.9;
+}
+.tech .row { display: flex; gap: 12px; }
+.tech .lbl { color: var(--orange); min-width: 95px; text-align: right; font-weight: 500; flex-shrink: 0; }
+
+/* ---- LIST ---- */
+.s ul { list-style: none; padding: 0; margin: 12px 0; }
+.s ul li {
+  position: relative; padding-left: 18px; margin-bottom: 10px;
+  font-size: 14px; color: #44403c;
+}
+.s ul li::before {
+  content: ''; position: absolute; left: 0; top: 9px;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--orange);
+}
+.s ul li strong { color: var(--ink); }
+
+/* ---- FLOW ---- */
+.flow { display: flex; gap: 10px; align-items: center; margin: 22px 0; overflow-x: auto; padding-bottom: 10px; }
+.flow-s {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 18px; min-width: 125px; text-align: center; flex-shrink: 0;
+}
+.flow-s .n { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 700; color: var(--orange); }
+.flow-s .l { font-size: 11px; color: var(--ink-dim); margin-top: 2px; }
+.flow-a { color: var(--ink-faint); font-size: 18px; flex-shrink: 0; }
+
+/* ---- SWATCHES ---- */
+.swatches { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 36px; }
+.sw {
+  width: 64px; height: 64px; border-radius: 12px; position: relative;
+  box-shadow: 0 1px 4px rgba(0,0,0,.1);
+}
+.sw::after {
+  content: attr(data-n); position: absolute; bottom: -20px; left: 0; right: 0;
+  text-align: center; font-family: 'Azeret Mono', monospace;
+  font-size: 9px; color: var(--ink-dim);
+}
+.sw-label {
+  font-family: 'Azeret Mono', monospace; font-size: 10px;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--ink-dim); margin-bottom: 8px;
+}
+
+/* ---- TYPE SPECIMEN ---- */
+.type-row { display: flex; align-items: baseline; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
+.type-lbl {
+  font-family: 'Azeret Mono', monospace; font-size: 10px;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--ink-dim); min-width: 90px;
+}
+
+/* ---- DIVIDER ---- */
+hr { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+
+/* ---- PERSONA ---- */
+.persona {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 24px; margin: 14px 0; display: flex; gap: 18px; align-items: flex-start;
+}
+.persona .avi {
+  width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
+}
+.persona h5 { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+.persona .meta { font-size: 12px; color: var(--ink-dim); margin-bottom: 6px; }
+.persona p { font-size: 13px; color: #44403c; margin: 0; line-height: 1.55; }
+</style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="brand">Plan.</div>
+  <a href="#vision">Vision</a>
+  <a href="#problem">The Problem</a>
+  <a href="#audience">Audience</a>
+  <a href="#competitors">Competitors</a>
+  <a href="#features">Features</a>
+  <a class="indent" href="#feed">The Feed</a>
+  <a class="indent" href="#plans">Plans</a>
+  <a class="indent" href="#orgs">Org Pages</a>
+  <a class="indent" href="#map">Campus Map</a>
+  <a class="indent" href="#match">Plan Match</a>
+  <div class="sep"></div>
+  <a href="#screens">Screens</a>
+  <a href="#design">Design Language</a>
+  <a class="indent" href="#color">Colors</a>
+  <a class="indent" href="#type">Typography</a>
+  <a class="indent" href="#motion">Motion</a>
+  <a class="indent" href="#components">Components</a>
+  <a href="#backend">Backend</a>
+  <a href="#ai">AI & Data</a>
+  <a href="#social">Social Network</a>
+  <a href="#growth">Growth</a>
+  <a href="#monetize">Monetization</a>
+  <a href="#launch">Launch Plan</a>
+</nav>
+
+<div class="page">
+
+<!-- ===== HERO ===== -->
+<header class="hero">
+  <div class="kicker">Product Specification v1.0</div>
+  <h1><span>Plan.</span><br>Never miss what matters on campus.</h1>
+  <p class="sub">A campus native event discovery and social planning app that aggregates everything happening at your school, shows you what your friends are doing, and makes it effortless to rally a group and go.</p>
+  <div class="chips">
+    <span class="chip">iOS + Android</span>
+    <span class="chip">React Native · Python</span>
+    <span class="chip">.edu Verified</span>
+    <span class="chip">Campus First</span>
+    <span class="chip">Zero Organizer Fees</span>
+  </div>
+</header>
+
+<!-- ===== 01 VISION ===== -->
+<div class="s" id="vision">
+  <div class="s-num">01 — Vision</div>
+  <h2>What Plan is and why it exists</h2>
+  <p>College campuses are the densest event ecosystems in the country. On any given week at a school like UChicago, there are dozens of events: org meetings, speaker panels, house parties, open mics, pickup basketball, study groups, bar nights, film screenings, cultural celebrations, and more. But students consistently report the same problem: they do not know what is happening.</p>
+  <p>Events are scattered across departmental emails, Instagram stories, GroupMe threads, physical flyers, university calendar systems, and word of mouth. There is no single place to see everything. And even when students find an event, they face a second, harder problem: <strong>they do not want to go alone.</strong></p>
+  <p><strong>Plan solves both.</strong> It is a single feed of everything happening on and around your campus, personalized to your interests, with a built in social layer that answers "who is going?" and gives you a one tap tool to make a plan with friends.</p>
+
+  <div class="co">
+    <h5>One line</h5>
+    <p>Plan is the homepage for your campus social life: see everything, know who is going, make a plan, and go.</p>
+  </div>
+</div>
+
+<!-- ===== 02 PROBLEM ===== -->
+<div class="s" id="problem">
+  <div class="s-num">02 — The Problem</div>
+  <h2>Why existing tools fail campus communities</h2>
+
+  <p>According to a Gallup study, 39% of college students report feeling lonely for much of the day. The U.S. Surgeon General has declared loneliness a public health epidemic, with 73% of people aged 16 to 24 reporting struggles with it. Meanwhile, Pew Research found that 68% of students first learn about campus events through social media or group messaging apps, neither of which is designed for event discovery.</p>
+
+  <h3>The fragmentation problem</h3>
+  <p>A typical student at a mid to large university receives event information from: the university events calendar (which nobody checks), departmental email blasts (which get buried), student org Instagram pages (which require following 50+ accounts), GroupMe or iMessage threads (which are noisy and disorganized), physical flyers (which are easily missed), and Eventbrite or external ticketing links (which feel transactional). There is no aggregation layer.</p>
+
+  <h3>The social barrier</h3>
+  <p>Even when students know about an event, the activation energy to attend is high. Research from Imperial College London found that students frequently cite "not having anyone to go with" and "not knowing what to expect" as top barriers to attendance. The existing tools (Eventbrite, campus calendar, Corq) are catalogues. They show events. They do not show your friends.</p>
+
+  <h3>The organizer problem</h3>
+  <p>Student orgs, campus venues, and small promoters struggle with distribution. A club might spend hours making a flyer, post it to their Instagram (where only existing members see it), and get 12 attendees at an event designed for 100. They need a distribution channel that reaches students who would care but do not yet know the org exists.</p>
+</div>
+
+<!-- ===== 03 AUDIENCE ===== -->
+<div class="s" id="audience">
+  <div class="s-num">03 — Target Audience</div>
+  <h2>Who Plan is for</h2>
+
+  <div class="persona">
+    <div class="avi" style="background:var(--orange-light);">🎒</div>
+    <div>
+      <h5>The Social Explorer</h5>
+      <div class="meta">Sophomore · Wants to branch out beyond their dorm friend group</div>
+      <p>Goes to 2 to 3 events per week but always hears about the best ones after they happen. Follows 30+ org Instagrams but still misses things. Would attend more if they had someone to go with. This is the primary user.</p>
+    </div>
+  </div>
+  <div class="persona">
+    <div class="avi" style="background:var(--blue-light);">🆕</div>
+    <div>
+      <h5>The Freshman / Transfer</h5>
+      <div class="meta">First year · Knows nobody · Highest intent user for social matching</div>
+      <p>Arrived on campus without an established friend group. Wants to meet people but does not know where to start. Existing apps (ZeeMee, MeetYourClass) help before arrival but drop off once school starts. Plan picks up where they leave off.</p>
+    </div>
+  </div>
+  <div class="persona">
+    <div class="avi" style="background:var(--green-light);">📣</div>
+    <div>
+      <h5>The Org Leader</h5>
+      <div class="meta">Junior · Runs a student org · Needs distribution for events</div>
+      <p>Spends 3 to 5 hours per week promoting events across multiple channels and still gets underwhelming turnout. Wants a single place to post once and reach the students who would actually care, not just existing members. This is the supply side user.</p>
+    </div>
+  </div>
+  <div class="persona">
+    <div class="avi" style="background:var(--purple-light);">🎵</div>
+    <div>
+      <h5>The Off Campus Regular</h5>
+      <div class="meta">Senior · Lives off campus · Interested in bar/music/nightlife scene around school</div>
+      <p>Has outgrown purely campus events and wants to discover what is happening in the surrounding neighborhood (Hyde Park, Wicker Park, Lincoln Park depending on school). Plan's radius extends beyond the campus boundary to cover the student social orbit.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 04 COMPETITORS ===== -->
+<div class="s" id="competitors">
+  <div class="s-num">04 — Competitive Landscape</div>
+  <h2>What exists and where they fall short</h2>
+
+  <table class="tbl">
+    <tr><th>Product</th><th>What it does</th><th>Where it fails for students</th></tr>
+    <tr><td>Corq</td><td>Aggregates 130K+ campus events from 250+ schools. Category browsing.</td><td>No social layer. No friend activity. No plans. Feels like a catalogue, not a social app. Limited off campus events.</td></tr>
+    <tr><td>Cove</td><td>Campus event sharing, host following, RSVPs. Growing at Texas A&M and a few others.</td><td>School by school rollout is slow. No AI personalization. Limited to what hosts post (no aggregation from university calendars or scraping).</td></tr>
+    <tr><td>DoorList</td><td>Free ticketing for student events. 0% fees. Guest list management and QR check in.</td><td>Ticketing tool, not a discovery platform. Students have to already know about the event to find it. No feed. No social layer.</td></tr>
+    <tr><td>University Calendar</td><td>Official campus event system (often powered by Engage/CampusLabs or Eventus).</td><td>Nobody checks it. Buried in the university website. No personalization. No social features. Admin facing, not student facing.</td></tr>
+    <tr><td>Instagram + GroupMe</td><td>De facto how 68% of students hear about events.</td><td>Fragmented across dozens of accounts and chats. No aggregation. No RSVP. No discovery beyond your existing network.</td></tr>
+    <tr><td>Facebook Events</td><td>Still has event functionality but usage is collapsing among 18 to 22 year olds.</td><td>Gen Z does not use Facebook. Period.</td></tr>
+    <tr><td>ZeeMee / MeetYourClass</td><td>Pre arrival friend matching for incoming students.</td><td>Engagement drops off sharply after the first 2 weeks of school. No event discovery. Not designed for ongoing campus life.</td></tr>
+  </table>
+
+  <div class="co blue">
+    <h5>Plan's positioning</h5>
+    <p>Plan is not a ticketing tool (DoorList), not a pre arrival network (ZeeMee), and not a university admin system (CampusLabs). It is the student facing social layer for campus life: discovery + friends + plans, in one app.</p>
+  </div>
+</div>
+
+<!-- ===== 05 FEATURES ===== -->
+<div class="s" id="features">
+  <div class="s-num">05 — Features</div>
+  <h2>What Plan does</h2>
+
+  <div class="grid">
+    <div class="card">
+      <span class="badge core">Core</span>
+      <div class="ico">📱</div>
+      <h5>The Feed</h5>
+      <p>A personalized, scrollable feed of everything happening on and around campus. Ranked by your interests, your friends' activity, and temporal relevance. Each card shows who among your friends is going.</p>
+    </div>
+    <div class="card">
+      <span class="badge social">Social</span>
+      <div class="ico">🗓️</div>
+      <h5>Plans</h5>
+      <p>Create a Plan around any event or time slot ("Friday night"). Invite friends, vote on options, lock the plan, coordinate logistics. Plans are ephemeral: they live, they serve their purpose, and they archive.</p>
+    </div>
+    <div class="card">
+      <span class="badge campus">Campus</span>
+      <div class="ico">🏛️</div>
+      <h5>Org Pages</h5>
+      <p>Every student org, department, and campus venue gets a living page with upcoming events, member count, vibe tags, and a follow button. Org leaders claim pages for free and post events in under 60 seconds.</p>
+    </div>
+    <div class="card">
+      <span class="badge ai">AI</span>
+      <div class="ico">✨</div>
+      <h5>For You Engine</h5>
+      <p>Connects to Spotify. Learns from your saves, RSVPs, dismissals, and attendance. Builds a taste profile that improves weekly. Cold start solved by onboarding quiz + school specific trending data.</p>
+    </div>
+    <div class="card">
+      <span class="badge core">Core</span>
+      <div class="ico">🗺️</div>
+      <h5>Campus Map</h5>
+      <p>A real time map of campus and surrounding area showing events happening now, tonight, and this week. Pins pulse for live events. Heat zones show social density. Building names labeled for wayfinding.</p>
+    </div>
+    <div class="card">
+      <span class="badge social">Social</span>
+      <div class="ico">🤝</div>
+      <h5>Plan Match</h5>
+      <p>Opt in matching for students who want to meet new people. Matched into small groups (3 to 5) around a shared event. Group intros happen in app. Designed for freshmen and transfers who need a crew.</p>
+    </div>
+    <div class="card">
+      <span class="badge ai">AI</span>
+      <div class="ico">🔔</div>
+      <h5>Smart Nudges</h5>
+      <p>"3 friends just RSVPed to Comedy Show tonight." "You saved this event last week and it is tomorrow." "Based on your Thursday pattern, here are 3 options." Context aware, not spammy.</p>
+    </div>
+    <div class="card">
+      <span class="badge campus">Campus</span>
+      <div class="ico">🎟️</div>
+      <h5>Free Ticketing</h5>
+      <p>One tap RSVP for free events. For paid events, Apple Pay / Google Pay in under 3 seconds. 0% organizer fees. Period. Revenue comes from promoted events, not from taxing student orgs.</p>
+    </div>
+    <div class="card">
+      <span class="badge growth">Growth</span>
+      <div class="ico">📸</div>
+      <h5>Post Event Recap</h5>
+      <p>After an event, the Plan thread becomes a shared photo album. Attendees can add photos. A shareable recap card is auto generated for Instagram stories, driving organic discovery of the app.</p>
+    </div>
+    <div class="card">
+      <span class="badge campus">Campus</span>
+      <div class="ico">📢</div>
+      <h5>Org Dashboard</h5>
+      <p>Web based dashboard for org leaders. Post events, view audience analytics (who saved, who RSVPed, demographics of interested students), manage guest lists, and boost events with paid promotion.</p>
+    </div>
+    <div class="card">
+      <span class="badge social">Social</span>
+      <div class="ico">🏠</div>
+      <h5>Communities</h5>
+      <p>Interest based groups within a campus (e.g. "Jazz Heads at UChicago," "Pickup Basketball"). Not group chats: community feeds with relevant events auto surfaced. Follow to customize your feed further.</p>
+    </div>
+    <div class="card">
+      <span class="badge core">Core</span>
+      <div class="ico">🔍</div>
+      <h5>Explore</h5>
+      <p>Category browsing (Music, Sports, Academic, Social, Food, Nightlife, Wellness, Arts), keyword search, trending events, and curated collections ("Date Night Near Campus," "Free Things This Week").</p>
+    </div>
+  </div>
+
+  <!-- FEED DETAIL -->
+  <h3 id="feed">The Feed: Deep Dive</h3>
+  <p>The feed is the default screen and the core product surface. It is a vertically scrollable, card based feed ranked by a multi signal algorithm. The ranking considers:</p>
+  <ul>
+    <li><strong>Social signal (weight: 35%):</strong> Number of friends who have saved, RSVPed, or shared the event. A friend going is the single strongest predictor of attendance. An event where 3 friends are going always outranks a "better fit" event with zero social proof.</li>
+    <li><strong>Taste match (25%):</strong> Cosine similarity between the user's taste vector and the event's attribute vector. Built from Spotify listening, past behavior, onboarding quiz, and community memberships.</li>
+    <li><strong>Org affinity (15%):</strong> If the user follows the hosting org, or has attended that org's past events, the event is boosted. This rewards loyalty and makes following orgs meaningful.</li>
+    <li><strong>Temporal relevance (15%):</strong> Events happening tonight or this weekend are boosted. Events more than 10 days out are significantly deprioritized unless high demand (measured by save velocity).</li>
+    <li><strong>Novelty injection (10%):</strong> Every 6th to 8th card is a "Something new" wildcard from a category the user has not explored. Labeled transparently. This prevents echo chambers and helps orgs reach outside their existing audience.</li>
+  </ul>
+
+  <h4 class="orange">Event Card Anatomy</h4>
+  <p>Each card in the feed must communicate the following at a glance, without requiring a tap to open:</p>
+  <ul>
+    <li><strong>Hero image:</strong> 3:2 aspect ratio. If the org provided no image, generate a gradient card using the event category color + event title in display type. Never show a blank or placeholder.</li>
+    <li><strong>Org avatar + name:</strong> Top left overlay on the image. Tappable to go to the org page.</li>
+    <li><strong>Event title:</strong> Max 2 lines. Fraunces Bold. High contrast against the card background.</li>
+    <li><strong>Where + when:</strong> Single line. "Ida Noyes Hall · Tonight, 8 PM" or "Regenstein · Sat, Apr 19 · 2 PM". Relative time for events within 48 hours, absolute date for everything else.</li>
+    <li><strong>Price pill:</strong> "Free" (green background), "$5" (neutral), or "From $10" (neutral). Positioned next to the where/when line.</li>
+    <li><strong>Friend row:</strong> Up to 3 friend avatars + text: "Alex, Maya + 6 going" or "14 students interested" if no friends. This row is the most important element on the card beyond the title.</li>
+    <li><strong>AI chip (optional):</strong> A short reason line: "Because you follow Doc Films" or "Trending on campus." Appears only when relevant. Not on every card.</li>
+    <li><strong>Action bar:</strong> Three icons: Bookmark (save), Share (to a friend or Plan), RSVP/Get Tickets. Compact, aligned right.</li>
+  </ul>
+
+  <!-- PLANS DETAIL -->
+  <h3 id="plans">Plans: Deep Dive</h3>
+  <p>A Plan is a lightweight, ephemeral social thread built around an event or a time window. It is the core social mechanic that differentiates Plan from every competitor. Plans have a lifecycle:</p>
+
+  <div class="flow">
+    <div class="flow-s"><div class="n">1</div><div class="l">Create</div></div>
+    <div class="flow-a">→</div>
+    <div class="flow-s"><div class="n">2</div><div class="l">Invite</div></div>
+    <div class="flow-a">→</div>
+    <div class="flow-s"><div class="n">3</div><div class="l">Vote</div></div>
+    <div class="flow-a">→</div>
+    <div class="flow-s"><div class="n">4</div><div class="l">Lock</div></div>
+    <div class="flow-a">→</div>
+    <div class="flow-s"><div class="n">5</div><div class="l">Go</div></div>
+    <div class="flow-a">→</div>
+    <div class="flow-s"><div class="n">6</div><div class="l">Recap</div></div>
+  </div>
+
+  <ul>
+    <li><strong>Create:</strong> Tap "Start a Plan" from any event card, or from the Plans tab with a blank time window ("Saturday night"). Optionally attach 1 to 3 event options.</li>
+    <li><strong>Invite:</strong> Select friends from your Plan contacts (synced from phone contacts who are on the app). Non Plan users receive an SMS deep link: "Maya invited you to Jazz Night. Tap to join the plan."</li>
+    <li><strong>Vote:</strong> If multiple event options are attached, invitees vote with a single tap. Results update in real time. Ties broken by the Plan creator.</li>
+    <li><strong>Lock:</strong> Once an event is confirmed, the Plan transitions to a logistics hub: confirmed event card, meeting time picker, meeting point (with a map pin), and a "Get Tickets" button if the event is paid.</li>
+    <li><strong>Go (Live):</strong> During the event, the Plan supports lightweight coordination messages ("I am at the east entrance"), quick photo sharing, and real time location sharing (opt in, 2 hour auto expire).</li>
+    <li><strong>Recap:</strong> 24 hours after the event, the Plan auto archives into a recap: a photo grid, who was there, and a "Rate this" prompt (thumbs up/down) that feeds back into the recommendation engine. A share card is generated for Instagram stories.</li>
+  </ul>
+  <p><strong>Critical design decision:</strong> Plans are not group chats. They do not support persistent, freeform messaging after the event ends. This is intentional. Persistent group chats create notification fatigue and turn into ghost threads. Plans are born with a purpose, serve that purpose, and dissolve cleanly. If users want ongoing conversation, they already have iMessage and GroupMe.</p>
+
+  <!-- ORG PAGES -->
+  <h3 id="orgs">Org Pages: Deep Dive</h3>
+  <p>Every entity that hosts events gets a page in Plan. There are three page types:</p>
+  <ul>
+    <li><strong>Student Org:</strong> Claimed by the org's social chair or president via .edu email verification + org name match against the university's registered org list (via CampusLabs API or manual verification). Shows: upcoming events, follower count, org description, vibe tags, and a link to their external site/Instagram.</li>
+    <li><strong>Campus Venue:</strong> Auto generated from the university's building/venue database. Shows: events at that venue, building photo, address, hours (if applicable), and a map link. Venues like Ida Noyes, Reynolds Club, Ratner, Logan Center each get their own page.</li>
+    <li><strong>Off Campus Venue:</strong> Bars, restaurants, music venues within the student orbit. Claimed by venue owners or auto generated from Google Places data. Shows: upcoming events, vibe tags, distance from campus center, and a "regulars" count (how many Plan users have attended events there).</li>
+  </ul>
+  <p>Following an org or venue adds its events to your feed with an affinity boost. Org leaders can see how many followers they have, how many unique students their events reached, and what percentage of reach came from organic feed distribution vs. friend sharing.</p>
+
+  <!-- MAP -->
+  <h3 id="map">Campus Map: Deep Dive</h3>
+  <p>The map is the second tab and provides spatial discovery. It is centered on the user's campus by default, with a radius that extends 2 miles beyond the campus boundary to include the surrounding student neighborhood.</p>
+  <ul>
+    <li><strong>Pins:</strong> Each event is a pin. Pins are color coded by category (Music = orange, Academic = blue, Social = purple, Sports = green, Food = amber, Arts = rose). Pins for events happening right now pulse with a breathing animation. Future events have static pins.</li>
+    <li><strong>Clustering:</strong> At lower zoom levels, pins cluster into numbered circles. Tapping a cluster zooms in. At high zoom, individual pins are visible with the event title as a label.</li>
+    <li><strong>Time slider:</strong> A horizontal time scrubber at the top of the map lets users slide between "Now," "Tonight," "Tomorrow," and "This Weekend." The map updates in real time as the slider moves.</li>
+    <li><strong>Building labels:</strong> Major campus buildings are labeled at all zoom levels. This aids wayfinding for freshmen and transfers who do not yet know the campus layout.</li>
+    <li><strong>Social density heat:</strong> An optional toggle that overlays a heat map showing where Plan users are concentrated right now (anonymized, requires 10+ users in an area to display). This answers "where is everyone tonight?"</li>
+  </ul>
+
+  <!-- MATCH -->
+  <h3 id="match">Plan Match: Deep Dive</h3>
+  <p>Plan Match is an opt in feature for students who want to meet new people through shared events. It is specifically designed for freshmen, transfers, and anyone who wants to expand their social circle.</p>
+  <ul>
+    <li><strong>How it works:</strong> Users opt into Plan Match from settings. They select 3 to 5 interest tags. When they save or RSVP to an event, they can check a "Match me" box. Plan then groups 3 to 5 students who all expressed interest in the same event and have overlapping interest tags.</li>
+    <li><strong>Group intro:</strong> Matched students are placed in a temporary Plan thread with an icebreaker prompt generated by the app ("You all saved Jazz Night. What is your go to artist for a late night study session?"). This is not a 1 on 1 matching system. Groups of 3 to 5 reduce social pressure dramatically.</li>
+    <li><strong>After the event:</strong> The group can choose to add each other as friends on Plan, or the thread archives naturally. No lingering awkwardness.</li>
+    <li><strong>Safety:</strong> All users are .edu verified. Profiles show first name, graduation year, and interests only (no last names in Match). Users can report or block. A "Match quality" feedback loop (thumbs up/down after the event) refines the matching algorithm.</li>
+  </ul>
+</div>
+
+<!-- ===== 06 SCREENS ===== -->
+<div class="s" id="screens">
+  <div class="s-num">06 — Screen Architecture</div>
+  <h2>Navigation and information hierarchy</h2>
+
+  <p>Plan uses a 4 tab bottom navigation bar. Four tabs (not five) keeps the bar uncluttered and makes thumb reach easier on large phones. Search is accessible via a prominent search bar at the top of the Feed tab rather than a dedicated tab.</p>
+
+  <table class="tbl">
+    <tr><th>Tab</th><th>Screen</th><th>Purpose</th></tr>
+    <tr><td>Feed</td><td>Personalized event feed + search bar</td><td>Primary discovery surface. Default landing. Search, filter, and explore accessible from the top.</td></tr>
+    <tr><td>Map</td><td>Campus map with event pins</td><td>Spatial discovery. Time slider. Category filters. Building labels.</td></tr>
+    <tr><td>Plans</td><td>Active and archived plans</td><td>Social planning hub. Active plans sorted by upcoming date. Archived recaps below. Badge for pending invites.</td></tr>
+    <tr><td>You</td><td>Profile + settings</td><td>Taste profile visualization, followed orgs, friends, attendance history, Plan Match toggle, notification settings.</td></tr>
+  </table>
+
+  <h3>Onboarding Flow</h3>
+  <p>Progressive disclosure. Deliver value before asking for anything. The entire flow should take under 90 seconds.</p>
+
+  <div class="flow">
+    <div class="flow-s"><div class="n">1</div><div class="l">Sign up with .edu email or Apple/Google</div></div>
+    <div class="flow-a">→</div>
+    <div class="flow-s"><div class="n">2</div><div class="l">Select your school from a list</div></div>
+    <div class="flow-a">→</div>
+    <div class="flow-s"><div class="n">3</div><div class="l">Pick 5 interest tags from a visual grid</div></div>
+    <div class="flow-a">→</div>
+    <div class="flow-s"><div class="n">4</div><div class="l">Connect Spotify (optional, big prompt)</div></div>
+    <div class="flow-a">→</div>
+    <div class="flow-s"><div class="n">5</div><div class="l">Find friends (contacts sync)</div></div>
+    <div class="flow-a">→</div>
+    <div class="flow-s"><div class="n">6</div><div class="l">Your feed, instantly</div></div>
+  </div>
+
+  <p><strong>.edu verification</strong> is critical. It establishes trust, prevents outsiders from infiltrating the campus network, and creates the exclusivity that drove early Facebook adoption. Users sign up with their .edu email and receive a verification link. If they sign in with Apple/Google, they are prompted to link a .edu email within the first week (with a gentle nag, not a hard block).</p>
+
+  <h3>Event Detail Screen</h3>
+  <p>Opened by tapping any event card. The hero image expands with a shared element transition. Content below the image:</p>
+  <ul>
+    <li>Title, org name (tappable to org page), date/time, venue (tappable for map/directions), and price.</li>
+    <li><strong>Attendee strip:</strong> Horizontal scrollable row of avatars. Friends first, then mutual connections, then a count of total interested students.</li>
+    <li><strong>Description:</strong> Org provided text. Collapsible after 4 lines.</li>
+    <li><strong>Tags:</strong> Category tags and user generated vibe tags ("Chill," "Free food," "Loud," "Small group").</li>
+    <li><strong>"Start a Plan" button:</strong> The primary CTA. Pre populates a Plan with this event attached.</li>
+    <li><strong>RSVP / Get Tickets button:</strong> Secondary CTA. For users who want to go solo.</li>
+    <li><strong>Venue mini map:</strong> Static map thumbnail showing the building location. Tappable for full map with walking directions.</li>
+    <li><strong>Related events:</strong> Horizontal carousel of similar events (same org, same category, or same venue).</li>
+  </ul>
+</div>
+
+<!-- ===== 07 DESIGN ===== -->
+<div class="s" id="design">
+  <div class="s-num">07 — Design Language</div>
+  <h2>Visual identity and component system</h2>
+
+  <p>Plan's design language is <strong>"warm paper."</strong> Light mode first (students use their phones in classrooms, libraries, and outdoors during the day; a dark mode default would feel out of place). The palette uses warm off whites, creamy surfaces, and a vibrant orange accent that feels energetic without being corporate. The overall tone is <strong>friendly, effortless, and slightly editorial</strong>, like a well designed campus magazine that lives in your pocket.</p>
+  <p>Dark mode is fully supported as a system setting toggle, using warm dark grays (not pure black) to maintain the warm character.</p>
+
+  <h3 id="color">Color System</h3>
+
+  <div class="sw-label">Backgrounds (Light Mode)</div>
+  <div class="swatches">
+    <div class="sw" style="background:#faf8f5;" data-n="#FAF8F5"></div>
+    <div class="sw" style="background:#ffffff; border:1px solid #e4e0d8;" data-n="#FFFFFF"></div>
+    <div class="sw" style="background:#f2efe9;" data-n="#F2EFE9"></div>
+    <div class="sw" style="background:#e4e0d8;" data-n="#E4E0D8"></div>
+  </div>
+
+  <div class="sw-label">Backgrounds (Dark Mode)</div>
+  <div class="swatches">
+    <div class="sw" style="background:#141210;" data-n="#141210"></div>
+    <div class="sw" style="background:#1c1a17;" data-n="#1C1A17"></div>
+    <div class="sw" style="background:#252320;" data-n="#252320"></div>
+    <div class="sw" style="background:#33312e;" data-n="#33312E"></div>
+  </div>
+
+  <div class="sw-label">Accent + Category Colors</div>
+  <div class="swatches">
+    <div class="sw" style="background:#e85d04;" data-n="Orange"></div>
+    <div class="sw" style="background:#2563eb;" data-n="Blue"></div>
+    <div class="sw" style="background:#16a34a;" data-n="Green"></div>
+    <div class="sw" style="background:#7c3aed;" data-n="Purple"></div>
+    <div class="sw" style="background:#e11d48;" data-n="Rose"></div>
+    <div class="sw" style="background:#d97706;" data-n="Amber"></div>
+  </div>
+
+  <p style="margin-top:36px;"><strong>Orange (#E85D04)</strong> is the primary accent. It is Plan's brand color: used for CTAs, the logo, active tab indicators, and notification badges. It is warm, optimistic, and high contrast against both light and dark backgrounds.</p>
+  <p><strong>Category color mapping:</strong> Music/Nightlife = Orange, Academic/Lectures = Blue, Social/Parties = Purple, Sports/Outdoor = Green, Food & Drink = Amber, Arts/Culture = Rose. These appear as dot indicators, pill backgrounds at 10% opacity, and gradient overlays on image free event cards.</p>
+
+  <h3 id="type">Typography</h3>
+
+  <div style="margin:18px 0;">
+    <div class="type-row">
+      <span class="type-lbl">Display</span>
+      <span style="font-family:'Fraunces',serif; font-size:32px; font-weight:700;">Fraunces Bold — 32/36</span>
+    </div>
+    <div class="type-row">
+      <span class="type-lbl">Heading</span>
+      <span style="font-family:'General Sans',sans-serif; font-size:20px; font-weight:700;">General Sans Bold — 20/26</span>
+    </div>
+    <div class="type-row">
+      <span class="type-lbl">Body</span>
+      <span style="font-family:'General Sans',sans-serif; font-size:15px; font-weight:400;">General Sans Regular — 15/24</span>
+    </div>
+    <div class="type-row">
+      <span class="type-lbl">Caption</span>
+      <span style="font-family:'General Sans',sans-serif; font-size:12px; font-weight:500; color:var(--ink-dim);">General Sans Medium — 12/16</span>
+    </div>
+    <div class="type-row">
+      <span class="type-lbl">Mono / Tags</span>
+      <span style="font-family:'Azeret Mono',monospace; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--ink-dim);">Azeret Mono — 11/16</span>
+    </div>
+  </div>
+
+  <p><strong>Fraunces</strong> is the display face. It is a variable, old style serif with soft, organic curves and a "wonky" optical size axis that adds personality at large sizes. Used for the logo, the "Tonight" header on the feed, event titles on the detail screen, and splash/empty states. It gives Plan a warm, editorial feel that stands apart from the geometric sans serif monoculture of most apps.</p>
+  <p><strong>General Sans</strong> is the UI workhorse. Clean, geometric, slightly rounded terminals. Excellent legibility at small sizes. Used for all body copy, UI labels, buttons, and navigation. Available in variable weight.</p>
+  <p><strong>Azeret Mono</strong> is the precision face. Used for timestamps, metadata, category labels, section kickers, and tags. Its monospaced rhythm creates visual hierarchy and signals "data" to the reader without being cold.</p>
+
+  <h3 id="motion">Motion and Interaction</h3>
+
+  <h4 class="orange">Principles</h4>
+  <ul>
+    <li><strong>Spring physics everywhere:</strong> No linear or ease in/out curves. Springs (damping 0.75, stiffness 280 for standard transitions; damping 0.6, stiffness 200 for sheet presentations) give every interaction a physical, tactile feel. Use React Native Reanimated 3's withSpring.</li>
+    <li><strong>Gesture driven:</strong> Swipe right on a feed card = save (bookmark icon fills). Swipe left = dismiss ("not for me," trains the algorithm). Long press = quick preview sheet. Pull to refresh triggers a custom animation where the Plan logo compresses and springs back.</li>
+    <li><strong>Shared element transitions:</strong> Tapping an event card morphs the card into the detail screen. The hero image scales up, the card background expands to fill the screen, and the detail content fades in from below. This creates spatial continuity.</li>
+    <li><strong>Haptics:</strong> Light impact on save. Medium impact on RSVP. Success haptic on Plan lock. Haptics are mandatory, not optional. They compensate for the light color scheme and keep the UI feeling responsive.</li>
+  </ul>
+
+  <h4 class="orange">Key Micro Interactions</h4>
+  <ul>
+    <li><strong>RSVP button:</strong> On tap, fills with orange from left to right (180ms spring), checkmark appears with overshoot bounce. The friend count on the card increments by 1 in real time with a count up animation.</li>
+    <li><strong>Save bookmark:</strong> Icon fills from bottom to top (120ms) with a slight scale overshoot (1.0 to 1.15 to 1.0).</li>
+    <li><strong>Plan invite acceptance:</strong> When a friend accepts a Plan invite, their avatar slides into the attendee strip from the right with a spring animation and a confetti burst micro animation (3 to 5 tiny orange dots, 200ms, fades quickly).</li>
+    <li><strong>Map pin breathing:</strong> Live event pins scale 0.95 to 1.05 on a 2.5 second sinusoidal cycle. Future event pins are static. This creates a visual pulse that communicates "something is happening right now."</li>
+    <li><strong>Tab bar badge:</strong> When the Plan tab badge count increments, it scales from 0.5 to 1.0 with a spring overshoot.</li>
+    <li><strong>Vote cast:</strong> When a user votes in a Plan poll, the selected option gets a subtle glow (accent color, 20% opacity, 500ms fade in) and the vote count rolls up with a digit flip animation.</li>
+  </ul>
+
+  <h3 id="components">Component System</h3>
+
+  <h4 class="orange">Event Card</h4>
+  <p>Border radius: 14px. Background: surface white (#FFFFFF). Border: 1px solid #E4E0D8. Shadow: 0 1px 3px rgba(28,25,23,0.04), 0 4px 12px rgba(28,25,23,0.03). On press: shadow deepens to 0 2px 8px rgba(28,25,23,0.08) with 100ms spring. Image fills the top of the card, card content (title, meta, friend row, actions) sits below with 16px padding. Cards are separated by 12px vertical gap in the feed.</p>
+
+  <h4 class="orange">Buttons</h4>
+  <ul>
+    <li><strong>Primary:</strong> Orange fill (#E85D04), white text, 12px radius, 48px height, General Sans Semibold 15px. On press: scale 0.97, 100ms spring. Hover (web): slight brightness increase.</li>
+    <li><strong>Secondary:</strong> Transparent, 1px orange border, orange text. Same dimensions. On press: fills to orange at 8% opacity.</li>
+    <li><strong>Ghost:</strong> No border, ink dim text. On press: text darkens to full ink.</li>
+    <li><strong>Icon buttons:</strong> 40x40px touch target, 24px icon (SF Symbols on iOS, Material Symbols on Android). On tap: scale 0.85 to 1.0 spring.</li>
+  </ul>
+
+  <h4 class="orange">Pills and Tags</h4>
+  <p>Height: 26px. Full rounded radius (100px). 10px horizontal padding. Background: category color at 10% opacity. Text: category color at full. Azeret Mono Medium 10px, uppercase, 1px letter spacing. Used for: time ("Tonight, 8 PM"), price ("Free"), category ("Music"), and vibe tags ("Chill," "Free food").</p>
+
+  <h4 class="orange">Avatars</h4>
+  <p>Circular. Three sizes: 22px (inline friend proof row on cards), 32px (attendee strips and Plan threads), 48px (profile, friend list). Default: a warm gradient generated from a hash of the user's name, cycling through the accent palette. Online dot: 8px, green, 2px white border, bottom right.</p>
+
+  <h4 class="orange">Bottom Sheet</h4>
+  <p>Used for: Plan creation, quick event preview, filters, ticket checkout, Plan Match intros. Background: surface white, 85% opacity, 20px blur backdrop (glassmorphism in dark mode, frosted glass in light mode). Top radius: 20px. Drag handle: 36px wide, 4px height, #E4E0D8, centered. Dismiss on swipe down with velocity aware spring.</p>
+
+  <h4 class="orange">Tab Bar</h4>
+  <p>Background: surface white at 90% opacity, 12px backdrop blur in light mode. Height: 80px including safe area. Icons: 24px. Active: orange icon + 4px orange dot below. Inactive: ink dim. Labels: visible in all states (unlike the Pulse spec, campus users skew younger and benefit from explicit labels). General Sans Medium 10px.</p>
+
+  <h4 class="orange">Empty States</h4>
+  <p>Every empty state (no Plans yet, no saved events, no search results) uses a Fraunces italic headline + a brief body line + a single CTA. Example: empty Plans tab shows "No plans yet" in Fraunces 24px italic, "Start one from any event in your feed" in General Sans 14px, and a "Browse events" orange button. Empty states should feel inviting, not sterile.</p>
+</div>
+
+<!-- ===== 08 BACKEND ===== -->
+<div class="s" id="backend">
+  <div class="s-num">08 — Backend Architecture</div>
+  <h2>Technical stack</h2>
+
+  <div class="tech">
+    <div class="row"><span class="lbl">Client</span> React Native (Expo) · TypeScript · Reanimated 3 · React Navigation 7</div>
+    <div class="row"><span class="lbl">API</span> FastAPI (Python) · REST for CRUD · WebSockets for Plans chat</div>
+    <div class="row"><span class="lbl">Auth</span> .edu email verification · Firebase Auth (Apple, Google) · JWT + refresh</div>
+    <div class="row"><span class="lbl">Database</span> PostgreSQL · PostGIS (geospatial) · Redis (cache, sessions, rate limits)</div>
+    <div class="row"><span class="lbl">Search</span> Meilisearch (full text, typo tolerant, sub 50ms response)</div>
+    <div class="row"><span class="lbl">Real time</span> WebSockets (FastAPI) for Plan threads · FCM / APNs for push</div>
+    <div class="row"><span class="lbl">Storage</span> AWS S3 (images) · CloudFront CDN · libvips for resize/optimization</div>
+    <div class="row"><span class="lbl">ML</span> Python · scikit learn · sentence transformers · Celery workers</div>
+    <div class="row"><span class="lbl">Scraping</span> Scrapy + Playwright · Celery Beat scheduler · NLP event classification</div>
+    <div class="row"><span class="lbl">Infra</span> AWS ECS Fargate · Terraform · GitHub Actions · Sentry · PostHog analytics</div>
+  </div>
+
+  <h3>Core Data Models</h3>
+  <table class="tbl">
+    <tr><th>Model</th><th>Key Fields</th></tr>
+    <tr><td>User</td><td>id, email (.edu), school_id, name, avatar_url, grad_year, taste_vector float[128], spotify_token, plan_match_opted_in, created_at</td></tr>
+    <tr><td>School</td><td>id, name, domain (.uchicago.edu), center_lat, center_lng, radius_miles, timezone, active (bool)</td></tr>
+    <tr><td>Event</td><td>id, school_id, title, description, org_id, venue_id, start_time, end_time, price_min, price_max, capacity, category (enum), tags[], image_url, source (scraped | organic | api), attribute_vector float[128], trending_score, created_at</td></tr>
+    <tr><td>Org</td><td>id, school_id, name, type (student_org | department | venue | off_campus), description, avatar_url, claimed_by (user_id), follower_count, verified (bool)</td></tr>
+    <tr><td>Venue</td><td>id, school_id, name, location (PostGIS point), address, building_code, type (on_campus | off_campus), google_place_id</td></tr>
+    <tr><td>RSVP</td><td>id, user_id, event_id, status (going | interested | not_going), source (feed | plan | search), created_at</td></tr>
+    <tr><td>Follow</td><td>id, user_id, org_id, created_at</td></tr>
+    <tr><td>Friendship</td><td>id, user_a, user_b, status (pending | active), source (contacts | plan_match | manual), created_at</td></tr>
+    <tr><td>Plan</td><td>id, creator_id, school_id, title, event_ids[], status (proposal | voting | locked | live | archived), meeting_time, meeting_point (PostGIS), created_at</td></tr>
+    <tr><td>PlanMember</td><td>id, plan_id, user_id, status (invited | going | maybe | declined), invited_at</td></tr>
+    <tr><td>Message</td><td>id, plan_id, user_id, body, type (text | image | system | icebreaker), created_at</td></tr>
+    <tr><td>Community</td><td>id, school_id, name, description, interest_tags[], member_count, created_at</td></tr>
+    <tr><td>TasteProfile</td><td>id, user_id, genre_weights (jsonb), category_affinities (jsonb), time_prefs (jsonb), price_sensitivity (float), updated_at</td></tr>
+  </table>
+
+  <h3>Key API Endpoints</h3>
+  <ul>
+    <li><strong>GET /feed?school_id=&lat=&lng=&radius=:</strong> Paginated, ranked event feed. Returns pre computed social proof (friend RSVPs inlined per event to avoid N+1). Cached per user in Redis with 5 minute TTL, invalidated on new RSVP by inner circle friend.</li>
+    <li><strong>POST /events/:id/rsvp:</strong> Creates RSVP. Triggers WebSocket push to friends who saved the same event. Updates trending_score.</li>
+    <li><strong>POST /plans:</strong> Creates Plan. Sends push to invitees. Returns Plan with event card data embedded.</li>
+    <li><strong>WS /plans/:id/stream:</strong> Real time Plan thread. Messages, vote updates, status transitions, location pings.</li>
+    <li><strong>GET /map?bounds=&time_window=:</strong> Returns events within a geospatial bounding box with PostGIS ST_ClusterDBSCAN for pin clustering at low zoom.</li>
+    <li><strong>POST /match/opt-in:</strong> Enrolls user in Plan Match for a specific event. Background Celery job groups matched users and creates a Plan thread with an icebreaker.</li>
+    <li><strong>GET /orgs/:id:</strong> Org page data: description, upcoming events, follower count, social proof (which friends follow).</li>
+    <li><strong>POST /orgs/:id/events:</strong> Organizer event creation. Validates against school calendar for duplicate detection. Auto generates attribute vector via NLP pipeline.</li>
+  </ul>
+</div>
+
+<!-- ===== 09 AI ===== -->
+<div class="s" id="ai">
+  <div class="s-num">09 — AI and Data Pipeline</div>
+  <h2>Recommendation engine</h2>
+
+  <h3>Taste Profile Construction</h3>
+  <p>Each user has a 128 dimensional taste vector, updated incrementally:</p>
+  <ul>
+    <li><strong>Spotify (if connected):</strong> Top 50 artists and genre weights fetched via API. Mapped to pre trained genre embeddings. Weighted by recency (recent listens count 2x). This provides the strongest cold start signal.</li>
+    <li><strong>Onboarding quiz:</strong> 5 interest tags selected during onboarding, each mapping to a pre set embedding. Blended 50/50 with Spotify at first, decaying to 20/80 as behavioral data accumulates.</li>
+    <li><strong>Behavioral signals:</strong> Save = pull vector toward event (+0.05 cosine nudge). RSVP = stronger pull (+0.08). Dismiss = push away ( 0.03). Attendance confirmed = strongest pull (+0.10). Exponential moving average ensures the profile evolves with changing interests over a school year.</li>
+    <li><strong>Org affinity:</strong> Following an org boosts all events from that org by a flat multiplier (1.3x) independent of the taste vector, ensuring org loyalty is rewarded.</li>
+    <li><strong>Social contagion:</strong> If 3+ friends attend a category the user has not explored, a small exploration nudge (+0.02) is applied to that category dimension.</li>
+  </ul>
+
+  <h3>Event Vectors</h3>
+  <p>Each event gets a 128d attribute vector generated by encoding the title + description via sentence transformer (all MiniLM L6 v2), concatenating with one hot features (category, price bucket, time of day, day of week, venue type, school), and projecting to 128d. Generated on creation; re embedded weekly to incorporate user generated vibe tags.</p>
+
+  <h3>Feed Ranking Formula</h3>
+  <p>For each user event pair, the ranking score is:</p>
+  <div class="tech" style="font-size: 14px; line-height: 2;">
+    score = 0.35 × social_signal + 0.25 × taste_cosine + 0.15 × org_affinity + 0.15 × time_decay + 0.10 × trending
+  </div>
+  <p>Social signal = normalized count of friends going (capped at 1.0 when 5+ friends are going). Taste cosine = cosine similarity between user and event vectors. Org affinity = 1.0 if following, 0.5 if attended past event from this org, 0 otherwise. Time decay = exponential decay from event start time (half life of 48 hours). Trending = RSVPs per hour divided by expected RSVPs for this event type at this lifecycle stage.</p>
+
+  <div class="co green">
+    <h5>Privacy by design</h5>
+    <p>Taste vectors are abstract and not reversible to raw data. Spotify data is processed and discarded after vector generation. Users see a human readable taste summary ("You are into: live music, late night, small groups, free events") and can manually adjust. All social visibility (who sees your RSVPs, who sees your location in Plans) is granularly controllable.</p>
+  </div>
+</div>
+
+<!-- ===== 10 SOCIAL NETWORK ===== -->
+<div class="s" id="social">
+  <div class="s-num">10 — Social Network</div>
+  <h2>How the social graph works</h2>
+
+  <h3>Friend Tiers</h3>
+  <ul>
+    <li><strong>Close Friends (max 10):</strong> Mutual opt in. Their RSVPs trigger push notifications. Their activity is always visible on event cards. You see their upcoming Plans. This tier is for your actual crew, your go to group for making plans.</li>
+    <li><strong>Friends (uncapped):</strong> Added via contacts sync, Plan Match, or in app add. Their attendance shows as social proof on event cards ("Alex is going"). You can invite them to Plans. Standard tier.</li>
+    <li><strong>Classmates (school wide):</strong> Every verified user at your school. Their activity contributes to anonymized counts ("47 students interested"). You do not see individual names. This is the ambient social layer that makes the app feel alive even before your personal friend graph is built.</li>
+  </ul>
+
+  <h3>The Social Graph as a Moat</h3>
+  <p>The more friends a user has on Plan, the more valuable the feed becomes (because social signal is the #1 ranking factor). This creates a compounding network effect:</p>
+  <ul>
+    <li>User A joins → invites 3 friends via a Plan → those friends see friend proof on events → they RSVP → their friends see that → more join.</li>
+    <li>At critical density (~30% of a social circle on Plan), the app becomes indispensable because every event card has friend context.</li>
+    <li>The target for a campus launch: 15% of the student body within 6 weeks. At a school of 7,000 undergrads, that is ~1,050 active users. At this density, most students will have 5+ friends on the app, which is the threshold where the social signal consistently improves the feed.</li>
+  </ul>
+
+  <h3>Campus Communities</h3>
+  <p>Communities are interest based groups within a school. They are not chat rooms. They are feed filters: joining "Jazz Heads at UChicago" surfaces jazz related events in your feed with an affinity boost. Communities have a light social component (member list, occasional pinned posts from community admins) but the primary value is feed curation.</p>
+  <p>Communities are seeded by the app (based on popular interest tags at the school) and can be created by any user with 5+ friends on the app. This prevents empty, dead communities on day one.</p>
+</div>
+
+<!-- ===== 11 GROWTH ===== -->
+<div class="s" id="growth">
+  <div class="s-num">11 — Growth Strategy</div>
+  <h2>How Plan spreads</h2>
+
+  <h3>Primary Growth Loop: Plan Invites</h3>
+  <p>Every Plan created is a potential 3 to 8 person acquisition event. When User A creates a Plan and invites Users B, C, D: if they are already on Plan, they get an in app notification. If they are not on Plan, they receive an SMS: "Maya invited you to Comedy Night at Logan Center. Tap to join the plan." The deep link opens the Plan in the app (or the App Store if not installed). This is the single most important acquisition channel and the reason the product is called "Plan."</p>
+
+  <h3>Secondary Loops</h3>
+  <ul>
+    <li><strong>Recap cards:</strong> After an event, Plan auto generates a branded share card (event photo + "We went to Jazz Night" + friend avatars + QR code). Users are prompted to share to Instagram stories. This drives organic awareness among non users who see the card.</li>
+    <li><strong>Org driven distribution:</strong> When an org posts an event on Plan, they naturally promote it to their members ("RSVP on Plan"). Each org becomes a distribution node, pulling their members onto the platform.</li>
+    <li><strong>"X friends are on Plan" notification:</strong> When a user's phone contacts join Plan, the user receives a push: "3 new friends joined Plan this week." This re engages dormant users and reinforces network density.</li>
+  </ul>
+
+  <h3>Campus Ambassador Program</h3>
+  <ul>
+    <li>Recruit 10 to 15 ambassadors per campus. Prioritize: social chairs of large orgs, RA leaders, Greek life social directors, and well connected freshmen.</li>
+    <li>Each ambassador gets: a unique referral code (tracks installs), a $50/month stipend, a budget for one Plan branded event per month, and early access to new features.</li>
+    <li>Their KPIs: installs from referral code, Plans created, events posted by orgs they onboard.</li>
+  </ul>
+
+  <h3>Key Metrics</h3>
+  <table class="tbl">
+    <tr><th>Metric</th><th>Target</th><th>Why</th></tr>
+    <tr><td>Weekly Active Plans</td><td>200+ per campus</td><td>North star. Measures both discovery and social engagement.</td></tr>
+    <tr><td>D7 Retention</td><td>40%+</td><td>Strong for social apps. Signals product market fit.</td></tr>
+    <tr><td>Activation (RSVP within 7 days)</td><td>50%+</td><td>User experienced core value.</td></tr>
+    <tr><td>Viral Coefficient (k)</td><td>> 1.0</td><td>Each user brings in more than 1 new user. Self sustaining growth.</td></tr>
+    <tr><td>Campus Penetration</td><td>15% of undergrads in 6 weeks</td><td>Threshold for social signal density.</td></tr>
+    <tr><td>Org Adoption</td><td>40% of registered orgs posting</td><td>Supply side health.</td></tr>
+  </table>
+</div>
+
+<!-- ===== 12 MONETIZATION ===== -->
+<div class="s" id="monetize">
+  <div class="s-num">12 — Monetization</div>
+  <h2>How Plan makes money (eventually)</h2>
+
+  <table class="tbl">
+    <tr><th>Phase</th><th>Timeline</th><th>Revenue Stream</th><th>Details</th></tr>
+    <tr><td>1</td><td>0 to 18 months</td><td>None</td><td>All features free. Zero organizer fees. Maximize campus adoption. Funded by pre seed / seed capital.</td></tr>
+    <tr><td>2</td><td>18 to 30 months</td><td>Promoted Events</td><td>Orgs and off campus venues pay to boost events in feeds. CPM ($6 to $12) targeting by school, year, interest. Self serve dashboard.</td></tr>
+    <tr><td>2</td><td>18 to 30 months</td><td>Brand Partnerships</td><td>National brands (Red Bull, Spotify, etc.) sponsor campus events or curated collections ("Red Bull Presents: Late Night Study Breaks"). Native ad format, not banner ads.</td></tr>
+    <tr><td>3</td><td>30+ months</td><td>Plan Pro (Org SaaS)</td><td>$19/mo for orgs wanting advanced analytics, CRM, email blasts to followers, and priority support. Free tier remains for basic listing.</td></tr>
+    <tr><td>3</td><td>30+ months</td><td>Ticketing (light)</td><td>1.5% + $0.30 per paid ticket. Only introduced after significant scale. Still dramatically below Eventbrite's 10 to 14%.</td></tr>
+    <tr><td>3</td><td>30+ months</td><td>Plan+ (Consumer)</td><td>$2.99/mo student price. Unlocks: expanded Plan Match, priority access to capped events, ad free feed, exclusive "Plan Picks" curated content.</td></tr>
+  </table>
+
+  <div class="co">
+    <h5>The 0% fee commitment</h5>
+    <p>Plan will never charge student organizations to list events. This is a core brand promise. Monetization comes from promoted placements and premium tiers, not from taxing the supply side. Student orgs already operate on shoestring budgets. Charging them would destroy the value proposition.</p>
+  </div>
+</div>
+
+<!-- ===== 13 LAUNCH ===== -->
+<div class="s" id="launch">
+  <div class="s-num">13 — Launch Plan</div>
+  <h2>Campus by campus, starting with UChicago</h2>
+
+  <h3>Why UChicago First</h3>
+  <ul>
+    <li><strong>Dense and contained:</strong> ~7,000 undergrads on a compact campus. High event density from 400+ RSOs. The surrounding Hyde Park neighborhood is the natural social orbit.</li>
+    <li><strong>Underserved:</strong> UChicago does not have a dominant campus social app. Event information is scattered across departmental emails, OrgSync/Engage, and Instagram. The pain point is acute.</li>
+    <li><strong>Home court:</strong> Being a student at UChicago provides direct access to the social graph, org leaders, and campus culture needed to seed the platform authentically.</li>
+    <li><strong>Replicable archetype:</strong> UChicago's size, structure, and event culture is representative of dozens of peer institutions (Northwestern, WashU, Rice, Emory, Vanderbilt, etc.), making the playbook transferable.</li>
+  </ul>
+
+  <h3>Pre Launch (8 Weeks Before)</h3>
+  <ul>
+    <li><strong>Seed the event database:</strong> Scrape UChicago events calendar, RSO pages, The Chicago Maroon events listings, Do312 (for Hyde Park and South Side events), and Instagram accounts of major RSOs.</li>
+    <li><strong>Recruit 12 ambassadors:</strong> Target social chairs from Major Activities Board, Order of the C, Student Government, large cultural orgs, and Greek councils.</li>
+    <li><strong>Instagram content series:</strong> Launch @plan.uchicago posting "What is happening on campus this week" carousels using the scraped event data. Build audience before the app ships.</li>
+    <li><strong>Waitlist landing page:</strong> Collect .uchicago.edu emails. First 300 signups get lifetime Plan+ free. Create scarcity and social proof.</li>
+    <li><strong>Org onboarding blitz:</strong> Personally demo the org dashboard to the 30 largest RSOs. Offer to migrate their existing event calendar into Plan for free.</li>
+  </ul>
+
+  <h3>Launch Week</h3>
+  <ul>
+    <li>Host 3 Plan branded events: a DJ set at Ida Noyes, a comedy show at Logan Center, and a free food social in Reynolds Club courtyard. These events are the first Plans and generate the initial social proof (photos, recaps, shares).</li>
+    <li>Ambassadors activate: each posts their unique referral link and hosts a "download Plan" mini event in their dorm or org meeting.</li>
+    <li>Target: 500 downloads in the first 3 days. 1,000 users by end of week 1. 100 Plans created by end of week 2.</li>
+  </ul>
+
+  <h3>Growth Phase (Months 1 to 3 at UChicago)</h3>
+  <ul>
+    <li>Hit 15% campus penetration (~1,050 active users) by week 6.</li>
+    <li>Onboard 40% of registered RSOs (~160 orgs posting events).</li>
+    <li>Measure: D7 retention, viral coefficient, Plans per week, feed engagement (save rate, RSVP rate).</li>
+  </ul>
+
+  <h3>Expansion (Month 3 to 12)</h3>
+  <ul>
+    <li>If UChicago metrics hit targets, expand to Northwestern (Evanston, 8 miles away, natural second campus). Then Loyola, DePaul, UIC, IIT to build a Chicago university network.</li>
+    <li>The Chicago cluster creates cross campus discovery: a UChicago student can see events at Northwestern and vice versa, which is uniquely powerful for off campus nightlife, concerts, and citywide events.</li>
+    <li>After Chicago is saturated (~5 campuses, 20K+ users), replicate the playbook at a second city cluster. Candidates: Ann Arbor (Michigan), Austin (UT Austin), or Atlanta (Emory, Georgia Tech, Morehouse/Spelman).</li>
+  </ul>
+
+  <div class="co purple">
+    <h5>The long term vision</h5>
+    <p>Plan is not just a campus app. It is a social layer for real life that starts on campuses because they are the densest, most contained social graphs in the world. As users graduate, they take their Plan graph with them. The app expands from campus events to city events naturally, following the user lifecycle. The college market is the wedge. The real life social network is the prize.</p>
+  </div>
+</div>
+
+<hr>
+
+<footer style="font-family:'Azeret Mono',monospace; font-size:11px; color:var(--ink-dim);">
+  Plan Product Specification v1.0 · April 2026 · Prepared for design and engineering reference.
+</footer>
+
+</div>
+</body>
+</html>

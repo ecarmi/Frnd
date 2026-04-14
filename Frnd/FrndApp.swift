@@ -17,12 +17,9 @@ struct RootView: View {
     @EnvironmentObject var appState: AppState
 
     var body: some View {
-        Group {
+        SwiftUI.Group {
             if appState.isAuthenticated && appState.onboardingComplete {
                 MainTabView()
-            } else if appState.isAuthenticated && !appState.onboardingComplete {
-                // User is authed but hasn't finished onboarding
-                OnboardingView()
             } else {
                 OnboardingView()
             }

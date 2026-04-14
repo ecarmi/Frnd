@@ -13,9 +13,10 @@ final class ProfileViewModel: ObservableObject {
         defer { isLoading = false }
         async let friendsResult = try? APIService.shared.fetchFriends()
         async let savedResult = try? APIService.shared.fetchSavedEvents()
+        async let attendedResult = try? APIService.shared.fetchAttendedEvents()
         friends = (await friendsResult) ?? []
         savedEvents = (await savedResult) ?? []
-        attendedEvents = []
+        attendedEvents = (await attendedResult) ?? []
     }
 }
 
@@ -175,7 +176,7 @@ struct ProfileView: View {
     // MARK: - Tab Content
 
     private var tabContent: some View {
-        Group {
+        SwiftUI.Group {
             switch selectedTab {
             case .saved:
                 if viewModel.savedEvents.isEmpty {
@@ -190,7 +191,17 @@ struct ProfileView: View {
                     .padding(.top, Spacing.md)
                 }
             case .attended:
-                emptyTabState(icon: "ticket", message: "Events you've attended will appear here")
+                if viewModel.attendedEvents.isEmpty {
+                    emptyTabState(icon: "ticket", message: "Events you've attended will appear here")
+                } else {
+                    LazyVStack(spacing: Spacing.sm) {
+                        ForEach(viewModel.attendedEvents) { event in
+                            SearchResultRow(event: event)
+                                .padding(.horizontal, Spacing.base)
+                        }
+                    }
+                    .padding(.top, Spacing.md)
+                }
             case .friends:
                 friendsList
             }

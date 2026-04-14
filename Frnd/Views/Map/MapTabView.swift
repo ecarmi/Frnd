@@ -97,7 +97,7 @@ struct MapTabView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .principal) {
                     Text("Map")
                         .font(.headingMedium)
                         .foregroundColor(.textPrimary)
@@ -203,9 +203,10 @@ struct MapEventPreview: View {
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.ember)
-                        .frame(width: 36, height: 36)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
                         .background(Color.ember.opacity(0.15))
-                        .clipShape(Circle())
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
             .padding(Spacing.base)

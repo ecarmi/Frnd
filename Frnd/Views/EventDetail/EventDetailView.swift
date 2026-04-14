@@ -21,14 +21,15 @@ struct EventDetailView: View {
                 // Hero image
                 ZStack(alignment: .topLeading) {
                     heroImage
-                    // Back button
+                    // Dismiss button
                     Button { dismiss() } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.white)
-                            .frame(width: 36, height: 36)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
                             .background(.ultraThinMaterial)
-                            .clipShape(Circle())
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .padding(16)
                     .padding(.top, 8)

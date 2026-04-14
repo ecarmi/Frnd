@@ -67,7 +67,7 @@ struct PlansView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .principal) {
                     Text(["Plans", "Groups", "LFG"][selectedSegment])
                         .font(.headingMedium)
                         .foregroundColor(.textPrimary)

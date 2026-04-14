@@ -113,7 +113,7 @@ struct SearchView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .principal) {
                     Text("Explore")
                         .font(.headingMedium)
                         .foregroundColor(.textPrimary)

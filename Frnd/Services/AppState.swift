@@ -11,12 +11,14 @@ final class AppState: ObservableObject {
     static let shared = AppState()
 
     private init() {
-        // Restore session from keychain/userdefaults
-        isAuthenticated = APIService.shared.isAuthenticated
+        // Restore session — a saved user means authenticated (real token or dev bypass)
         if let data = UserDefaults.standard.data(forKey: "current_user"),
            let user = try? JSONDecoder().decode(User.self, from: data) {
             currentUser = user
+            isAuthenticated = true
             onboardingComplete = user.onboardingComplete
+        } else {
+            isAuthenticated = APIService.shared.isAuthenticated
         }
     }
 

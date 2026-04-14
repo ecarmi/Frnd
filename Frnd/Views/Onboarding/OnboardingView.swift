@@ -3,7 +3,7 @@ import SwiftUI
 struct OnboardingView: View {
     @EnvironmentObject var appState: AppState
     @State private var step: OnboardingStep = .welcome
-    @State private var phone: String = ""
+    @State private var email: String = ""
     @State private var otp: String = ""
     @State private var selectedVibes: Set<String> = []
     @State private var name: String = ""
@@ -11,8 +11,10 @@ struct OnboardingView: View {
     @State private var errorMessage: String?
     @State private var isDevMode = false
 
+    private let devBypassEmail = "ecarmi@uchicago.edu"
+
     enum OnboardingStep {
-        case welcome, phone, otp, name, vibes, done
+        case welcome, email, otp, name, vibes, done
     }
 
     var body: some View {
@@ -20,7 +22,6 @@ struct OnboardingView: View {
             Color.bgPrimary.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Progress dots
                 if step != .welcome {
                     HStack(spacing: 8) {
                         ForEach(0..<4) { i in
@@ -35,11 +36,11 @@ struct OnboardingView: View {
 
                 Spacer()
 
-                Group {
+                SwiftUI.Group {
                     switch step {
-                    case .welcome: WelcomeStep(onContinue: { withAnimation { step = .phone } })
-                    case .phone:   PhoneStep(phone: $phone, isLoading: $isLoading, error: $errorMessage, onContinue: sendOTP)
-                    case .otp:     OTPStep(otp: $otp, phone: phone, isLoading: $isLoading, error: $errorMessage, onContinue: verifyOTP, onBack: { step = .phone })
+                    case .welcome: WelcomeStep(onContinue: { withAnimation { step = .email } })
+                    case .email:   EmailStep(email: $email, isLoading: $isLoading, error: $errorMessage, onContinue: sendEmailOTP)
+                    case .otp:     OTPStep(otp: $otp, email: email, isLoading: $isLoading, error: $errorMessage, isDevMode: isDevMode, onContinue: verifyOTP, onBack: { step = .email })
                     case .name:    NameStep(name: $name, onContinue: { withAnimation { step = .vibes } })
                     case .vibes:   VibeSelectionStep(selected: $selectedVibes, isLoading: $isLoading, onContinue: completeOnboarding)
                     case .done:    EmptyView()
@@ -59,7 +60,7 @@ struct OnboardingView: View {
     private var stepIndex: Int {
         switch step {
         case .welcome: return -1
-        case .phone:   return 0
+        case .email:   return 0
         case .otp:     return 1
         case .name:    return 2
         case .vibes:   return 3
@@ -69,19 +70,24 @@ struct OnboardingView: View {
 
     // MARK: - Actions
 
-    private func sendOTP() {
+    private func sendEmailOTP() {
+        let trimmed = email.trimmingCharacters(in: .whitespaces).lowercased()
         isLoading = true
         errorMessage = nil
         Task {
             defer { isLoading = false }
             do {
-                try await APIService.shared.requestOTP(phone: phone)
+                try await APIService.shared.requestEmailOTP(email: trimmed)
+                if trimmed == devBypassEmail {
+                    isDevMode = true
+                    errorMessage = "Dev mode — use code 000000"
+                }
                 withAnimation { step = .otp }
             } catch {
-                // Backend unreachable — activate dev bypass
+                // Backend unreachable — fall back to dev mode in DEBUG
                 #if DEBUG
                 isDevMode = true
-                errorMessage = "Dev mode: use code 000000"
+                errorMessage = "Dev mode — use code 000000"
                 withAnimation { step = .otp }
                 #else
                 errorMessage = error.localizedDescription
@@ -91,27 +97,40 @@ struct OnboardingView: View {
     }
 
     private func verifyOTP() {
-        #if DEBUG
-        if isDevMode && otp == "000000" {
-            let mockUser = User(
-                id: UUID().uuidString, phone: phone, name: "",
-                avatarURL: nil, latitude: 41.7991, longitude: -87.5876,
-                onboardingComplete: false, createdAt: Date()
-            )
-            appState.setUser(mockUser)
-            withAnimation { step = .name }
-            return
-        }
-        #endif
+        let trimmed = email.trimmingCharacters(in: .whitespaces).lowercased()
         isLoading = true
         errorMessage = nil
         Task {
             defer { isLoading = false }
             do {
-                let auth = try await APIService.shared.verifyOTP(phone: phone, code: otp)
+                let auth = try await APIService.shared.verifyEmailOTP(email: trimmed, code: otp)
                 appState.setUser(auth.user)
-                withAnimation { step = .name }
+                if auth.user.onboardingComplete {
+                    withAnimation { step = .done }
+                } else {
+                    withAnimation { step = .name }
+                }
             } catch {
+                // Backend unreachable — fall back to fully local mock only if dev mode
+                #if DEBUG
+                if isDevMode && otp == "000000" {
+                    let mockUser = User(
+                        id: UUID().uuidString,
+                        email: trimmed,
+                        phone: nil,
+                        university: trimmed.hasSuffix("uchicago.edu") ? "University of Chicago" : nil,
+                        name: "",
+                        avatarURL: nil,
+                        latitude: 41.7991,
+                        longitude: -87.5876,
+                        onboardingComplete: false,
+                        createdAt: Date()
+                    )
+                    appState.setUser(mockUser)
+                    withAnimation { step = .name }
+                    return
+                }
+                #endif
                 errorMessage = error.localizedDescription
             }
         }
@@ -122,9 +141,16 @@ struct OnboardingView: View {
         if isDevMode {
             guard let current = appState.currentUser else { return }
             let completed = User(
-                id: current.id, phone: current.phone, name: name.isEmpty ? "Dev User" : name,
-                avatarURL: nil, latitude: current.latitude, longitude: current.longitude,
-                onboardingComplete: true, createdAt: current.createdAt
+                id: current.id,
+                email: current.email,
+                phone: current.phone,
+                university: current.university,
+                name: name.isEmpty ? "Dev User" : name,
+                avatarURL: nil,
+                latitude: current.latitude,
+                longitude: current.longitude,
+                onboardingComplete: true,
+                createdAt: current.createdAt
             )
             appState.setUser(completed)
             return
@@ -154,10 +180,10 @@ private struct WelcomeStep: View {
                 Text("Frnd")
                     .font(.custom("Georgia", size: 64))
                     .foregroundColor(.textPrimary)
-                Text("Your city, tonight.")
+                Text("Your campus, tonight.")
                     .font(.headingMedium)
                     .foregroundColor(.ember)
-                Text("A personalized, social feed of things to do near you — with built-in tools to rally your crew and go.")
+                Text("Discover events, rally your crew, and actually make plans — all in one place.")
                     .font(.bodyLarge)
                     .foregroundColor(.textSecondary)
                     .multilineTextAlignment(.center)
@@ -169,39 +195,49 @@ private struct WelcomeStep: View {
     }
 }
 
-// MARK: - Phone Step
+// MARK: - Email Step
 
-private struct PhoneStep: View {
-    @Binding var phone: String
+private struct EmailStep: View {
+    @Binding var email: String
     @Binding var isLoading: Bool
     @Binding var error: String?
     let onContinue: () -> Void
 
+    private var isValidEdu: Bool {
+        email.lowercased().hasSuffix(".edu") && email.contains("@")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 32) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("What's your number?")
+                Text("Use your .edu email")
                     .font(.displayMedium)
                     .foregroundColor(.textPrimary)
-                Text("We'll text you a verification code.")
+                Text("Frnd is for university students. Sign in with your school email to join your campus community.")
                     .font(.bodyLarge)
                     .foregroundColor(.textSecondary)
             }
 
             VStack(spacing: 12) {
-                TextField("", text: $phone, prompt: Text("+1 (555) 000-0000").foregroundColor(.textTertiary))
-                    .font(.headingLarge)
-                    .foregroundColor(.textPrimary)
-                    .keyboardType(.phonePad)
-                    .padding()
-                    .background(Color.bgRaised)
-                    .clipShape(RoundedRectangle(cornerRadius: Radius.md))
-                    .overlay(RoundedRectangle(cornerRadius: Radius.md).strokeBorder(Color.bgBorder))
+                TextField(
+                    "",
+                    text: $email,
+                    prompt: Text("you@university.edu").foregroundColor(.textTertiary)
+                )
+                .font(.bodyLarge)
+                .foregroundColor(.textPrimary)
+                .keyboardType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .padding()
+                .background(Color.bgRaised)
+                .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+                .overlay(RoundedRectangle(cornerRadius: Radius.md).strokeBorder(Color.bgBorder))
 
                 if let error = error {
                     Text(error)
                         .font(.captionMedium)
-                        .foregroundColor(.rose)
+                        .foregroundColor(error.contains("Dev mode") ? .teal : .rose)
                 }
             }
 
@@ -213,7 +249,7 @@ private struct PhoneStep: View {
                 }
             }
             .buttonStyle(PrimaryButtonStyle())
-            .disabled(phone.count < 10 || isLoading)
+            .disabled(!isValidEdu || isLoading)
         }
     }
 }
@@ -222,19 +258,20 @@ private struct PhoneStep: View {
 
 private struct OTPStep: View {
     @Binding var otp: String
-    let phone: String
+    let email: String
     @Binding var isLoading: Bool
     @Binding var error: String?
+    let isDevMode: Bool
     let onContinue: () -> Void
     let onBack: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 32) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Enter the code")
+                Text("Check your email")
                     .font(.displayMedium)
                     .foregroundColor(.textPrimary)
-                Text("Sent to \(phone)")
+                Text(isDevMode ? "Dev mode active" : "Sent to \(email)")
                     .font(.bodyLarge)
                     .foregroundColor(.textSecondary)
             }
@@ -253,7 +290,7 @@ private struct OTPStep: View {
                 if let error = error {
                     Text(error)
                         .font(.captionMedium)
-                        .foregroundColor(.rose)
+                        .foregroundColor(error.contains("Dev") ? .teal : .rose)
                 }
             }
 
@@ -318,35 +355,32 @@ private struct VibeSelectionStep: View {
                 Text("Pick your vibes")
                     .font(.displayMedium)
                     .foregroundColor(.textPrimary)
-                Text("Choose at least 5 to personalize your feed.")
+                Text("Choose at least 3 to personalize your feed.")
                     .font(.bodyLarge)
                     .foregroundColor(.textSecondary)
             }
 
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(VibeTag.all) { tag in
-                        VibeTagButton(tag: tag, isSelected: selected.contains(tag.name)) {
-                            if selected.contains(tag.name) {
-                                selected.remove(tag.name)
-                            } else {
-                                selected.insert(tag.name)
-                            }
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(VibeTag.all) { tag in
+                    VibeTagButton(tag: tag, isSelected: selected.contains(tag.name)) {
+                        if selected.contains(tag.name) {
+                            selected.remove(tag.name)
+                        } else {
+                            selected.insert(tag.name)
                         }
                     }
                 }
             }
-            .frame(maxHeight: 360)
 
             Button(action: onContinue) {
                 if isLoading {
                     ProgressView().tint(.white)
                 } else {
-                    Text("Build My Feed (\(selected.count) selected)")
+                    Text("Build My Feed  ·  \(selected.count) selected")
                 }
             }
             .buttonStyle(PrimaryButtonStyle())
-            .disabled(selected.count < 5 || isLoading)
+            .disabled(selected.count < 3 || isLoading)
         }
     }
 }

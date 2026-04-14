@@ -9,6 +9,7 @@ struct CreatePlanView: View {
     @State private var inviteeIds: Set<String> = []
     @State private var isLoading = false
     @State private var friends: [Friendship] = []
+    @State private var errorMessage: String?
 
     init(prefillEvent: Event?) {
         self.prefillEvent = prefillEvent
@@ -98,6 +99,16 @@ struct CreatePlanView: View {
                             }
                         }
 
+                        if let errorMessage {
+                            Text(errorMessage)
+                                .font(.captionMedium)
+                                .foregroundColor(.rose)
+                                .padding(Spacing.md)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.rose.opacity(0.1))
+                                .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+                        }
+
                         Button(action: createPlan) {
                             if isLoading {
                                 ProgressView().tint(.white)
@@ -140,7 +151,7 @@ struct CreatePlanView: View {
                 )
                 dismiss()
             } catch {
-                // Handle error
+                errorMessage = error.localizedDescription
             }
         }
     }

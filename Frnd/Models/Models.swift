@@ -151,7 +151,9 @@ enum CarpoolStatus: String, Codable {
 
 struct User: Codable, Identifiable {
     let id: String
+    let email: String?
     let phone: String?
+    let university: String?
     let name: String
     let avatarURL: String?
     let latitude: Double?
@@ -159,7 +161,6 @@ struct User: Codable, Identifiable {
     let onboardingComplete: Bool
     let createdAt: Date
 
-    // Derived from TasteProfile
     var tasteProfile: TasteProfile?
 
     var location: CLLocationCoordinate2D? {
@@ -168,7 +169,7 @@ struct User: Codable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, phone, name
+        case id, email, phone, university, name
         case avatarURL        = "avatar_url"
         case latitude, longitude
         case onboardingComplete = "onboarding_complete"
@@ -590,12 +591,12 @@ struct AuthResponse: Codable {
     }
 }
 
-struct OTPRequest: Codable {
-    let phone: String
+struct EmailOTPRequest: Codable {
+    let email: String
 }
 
-struct OTPVerify: Codable {
-    let phone: String
+struct EmailOTPVerify: Codable {
+    let email: String
     let code: String
 }
 
@@ -610,24 +611,27 @@ struct VibeTag: Identifiable {
 
 extension VibeTag {
     static let all: [VibeTag] = [
-        VibeTag(name: "Live Music", emoji: "🎸", category: .music),
-        VibeTag(name: "DJ Sets", emoji: "🎧", category: .music),
-        VibeTag(name: "Jazz", emoji: "🎷", category: .music),
-        VibeTag(name: "Hip-Hop", emoji: "🎤", category: .music),
-        VibeTag(name: "Electronic", emoji: "⚡️", category: .music),
-        VibeTag(name: "Club Night", emoji: "🌙", category: .nightlife),
-        VibeTag(name: "Rooftop Bars", emoji: "🏙️", category: .nightlife),
-        VibeTag(name: "Speakeasies", category: .nightlife, emoji: "🥃"),
-        VibeTag(name: "Comedy", emoji: "😂", category: .arts),
-        VibeTag(name: "Art Openings", emoji: "🎨", category: .arts),
-        VibeTag(name: "Film", emoji: "🎬", category: .arts),
-        VibeTag(name: "Theater", emoji: "🎭", category: .arts),
-        VibeTag(name: "Food Pop-ups", emoji: "🍜", category: .foodDrink),
-        VibeTag(name: "Wine Tastings", emoji: "🍷", category: .foodDrink),
-        VibeTag(name: "Brunch", emoji: "🥂", category: .foodDrink),
-        VibeTag(name: "Running", emoji: "🏃", category: .sports),
-        VibeTag(name: "Yoga", emoji: "🧘", category: .sports),
-        VibeTag(name: "Basketball", emoji: "🏀", category: .sports),
+        // Music
+        VibeTag(name: "Live Music",  emoji: "🎸", category: .music),
+        VibeTag(name: "DJ / Dance",  emoji: "🎧", category: .music),
+        VibeTag(name: "Jazz & Soul", emoji: "🎷", category: .music),
+        // Going out
+        VibeTag(name: "Party",       emoji: "🌙", category: .nightlife),
+        VibeTag(name: "Bar Hopping", emoji: "🍻", category: .nightlife),
+        VibeTag(name: "Rooftops",    emoji: "🏙️", category: .nightlife),
+        // Arts & culture
+        VibeTag(name: "Comedy",      emoji: "😂", category: .arts),
+        VibeTag(name: "Art & Design",emoji: "🎨", category: .arts),
+        VibeTag(name: "Film & Theater", emoji: "🎬", category: .arts),
+        // Food & drink
+        VibeTag(name: "Brunch",      emoji: "🥂", category: .foodDrink),
+        VibeTag(name: "Food Pop-ups",emoji: "🍜", category: .foodDrink),
+        // Active
+        VibeTag(name: "Sports",      emoji: "🏀", category: .sports),
+        VibeTag(name: "Fitness",     emoji: "🏃", category: .sports),
+        // Campus
+        VibeTag(name: "Study",       emoji: "📚", category: .other),
+        VibeTag(name: "Networking",  emoji: "🤝", category: .other),
     ]
 }
 
@@ -659,8 +663,8 @@ extension Event {
             tags: ["Jazz", "Live Music", "Hyde Park"],
             imageURL: nil, source: "organic", trendingScore: 0.87,
             friendsGoing: [
-                User(id: "u2", phone: nil, name: "Alex Chen", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
-                User(id: "u3", phone: nil, name: "Jordan Kim", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
+                User(id: "u2", email: nil, phone: nil, university: nil, name: "Alex Chen", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
+                User(id: "u3", email: nil, phone: nil, university: nil, name: "Jordan Kim", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
             ],
             friendsInterested: [],
             totalInterested: 47,
@@ -685,7 +689,7 @@ extension Event {
             tags: ["Electronic", "Techno", "Late Night"],
             imageURL: nil, source: "organic", trendingScore: 0.92,
             friendsGoing: [
-                User(id: "u4", phone: nil, name: "Sam Rivera", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
+                User(id: "u4", email: nil, phone: nil, university: nil, name: "Sam Rivera", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
             ],
             friendsInterested: [],
             totalInterested: 112,
@@ -733,9 +737,9 @@ extension Event {
             tags: ["Brunch", "Bottomless", "West Loop"],
             imageURL: nil, source: "organic", trendingScore: 0.68,
             friendsGoing: [
-                User(id: "u5", phone: nil, name: "Maya Johnson", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
-                User(id: "u6", phone: nil, name: "Tyler Brooks", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
-                User(id: "u7", phone: nil, name: "Priya Nair", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
+                User(id: "u5", email: nil, phone: nil, university: nil, name: "Maya Johnson", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
+                User(id: "u6", email: nil, phone: nil, university: nil, name: "Tyler Brooks", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
+                User(id: "u7", email: nil, phone: nil, university: nil, name: "Priya Nair", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
             ],
             friendsInterested: [],
             totalInterested: 34,
@@ -759,9 +763,9 @@ extension Plan {
             members: [
                 PlanMember(id: "pm1", planId: "p1", userId: "me", status: .going),
                 PlanMember(id: "pm2", planId: "p1", userId: "u2", status: .going,
-                           user: User(id: "u2", phone: nil, name: "Alex Chen", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date())),
+                           user: User(id: "u2", email: nil, phone: nil, university: nil, name: "Alex Chen", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date())),
                 PlanMember(id: "pm3", planId: "p1", userId: "u3", status: .invited,
-                           user: User(id: "u3", phone: nil, name: "Jordan Kim", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date())),
+                           user: User(id: "u3", email: nil, phone: nil, university: nil, name: "Jordan Kim", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date())),
             ],
             messages: [],
             createdAt: Date()

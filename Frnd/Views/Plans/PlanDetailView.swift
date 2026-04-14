@@ -7,6 +7,7 @@ struct PlanDetailView: View {
     @State private var scrollToBottom = false
     @State private var carpools: [Carpool] = []
     @State private var showOfferCarpool = false
+    @State private var showInviteSheet = false
     @EnvironmentObject var appState: AppState
 
     var body: some View {
@@ -53,6 +54,11 @@ struct PlanDetailView: View {
                 carpools.append(carpool)
             }
         }
+        .sheet(isPresented: $showInviteSheet) {
+            InviteFriendsSheet(plan: plan) { updatedPlan in
+                plan = updatedPlan
+            }
+        }
         .task {
             carpools = (try? await APIService.shared.fetchCarpools(planId: plan.id)) ?? []
         }
@@ -80,7 +86,7 @@ struct PlanDetailView: View {
                 }
                 // Add members button
                 Button {
-                    // TODO: invite sheet
+                    showInviteSheet = true
                 } label: {
                     VStack(spacing: 4) {
                         ZStack {
@@ -516,6 +522,121 @@ struct OfferCarpoolSheet: View {
                     .foregroundColor(.teal)
                     .disabled(departureLocation.isEmpty || isLoading)
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Invite Friends Sheet
+
+struct InviteFriendsSheet: View {
+    let plan: Plan
+    let onInvited: (Plan) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var friends: [Friendship] = []
+    @State private var selected: Set<String> = []
+    @State private var isLoading = false
+    @State private var isSending = false
+    @State private var error: String?
+
+    private var alreadyInPlan: Set<String> {
+        Set(plan.members.map { $0.userId })
+    }
+
+    private var invitableFriends: [Friendship] {
+        friends.filter {
+            guard let user = $0.otherUser else { return false }
+            return !alreadyInPlan.contains(user.id)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.bgPrimary.ignoresSafeArea()
+
+                if isLoading {
+                    ProgressView().tint(.ember)
+                } else if invitableFriends.isEmpty {
+                    VStack(spacing: Spacing.md) {
+                        Image(systemName: "person.2")
+                            .font(.system(size: 40))
+                            .foregroundColor(.textTertiary)
+                        Text("Everyone's already in this plan!")
+                            .font(.bodyMedium)
+                            .foregroundColor(.textSecondary)
+                    }
+                } else {
+                    List {
+                        Section {
+                            ForEach(invitableFriends) { friendship in
+                                if let user = friendship.otherUser {
+                                    Button {
+                                        if selected.contains(user.id) {
+                                            selected.remove(user.id)
+                                        } else {
+                                            selected.insert(user.id)
+                                        }
+                                    } label: {
+                                        HStack(spacing: Spacing.md) {
+                                            AvatarView(name: user.name, imageURL: user.avatarURL, size: 40)
+                                            Text(user.name)
+                                                .font(.headingSmall)
+                                                .foregroundColor(.textPrimary)
+                                            Spacer()
+                                            if selected.contains(user.id) {
+                                                Image(systemName: "checkmark.circle.fill")
+                                                    .foregroundColor(.ember)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .listRowBackground(Color.bgRaised)
+
+                        if let error = error {
+                            Section {
+                                Text(error).foregroundColor(.rose).font(.captionMedium)
+                            }
+                            .listRowBackground(Color.bgRaised)
+                        }
+                    }
+                    .scrollContentBackground(.hidden)
+                }
+            }
+            .navigationTitle("Invite Friends")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }.foregroundColor(.textSecondary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Invite (\(selected.count))") {
+                        Task {
+                            isSending = true
+                            do {
+                                let updated = try await APIService.shared.inviteToPlan(
+                                    planId: plan.id,
+                                    userIds: Array(selected)
+                                )
+                                onInvited(updated)
+                                dismiss()
+                            } catch {
+                                self.error = error.localizedDescription
+                            }
+                            isSending = false
+                        }
+                    }
+                    .foregroundColor(.ember)
+                    .disabled(selected.isEmpty || isSending)
+                }
+            }
+            .task {
+                isLoading = true
+                friends = (try? await APIService.shared.fetchFriends()) ?? []
+                isLoading = false
             }
         }
     }

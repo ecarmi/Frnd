@@ -285,7 +285,7 @@ struct GroupDetailView: View {
             }
             .padding(Spacing.base)
             .background(Color.teal.opacity(0.1))
-            .cornerRadius(Radius.base)
+            .cornerRadius(Radius.md)
         }
     }
 
@@ -442,7 +442,7 @@ struct JoinGroupSheet: View {
                         .multilineTextAlignment(.center)
                         .padding()
                         .background(Color.bgSurface)
-                        .cornerRadius(Radius.base)
+                        .cornerRadius(Radius.md)
                         .padding(.horizontal, Spacing.xl)
                     if let error = error {
                         Text(error).foregroundColor(.rose).font(.captionMedium)

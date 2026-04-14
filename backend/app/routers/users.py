@@ -46,12 +46,12 @@ async def complete_onboarding(
 ):
     # Map vibe tag names → category affinities
     category_map = {
-        "Live Music": "music", "DJ Sets": "music", "Jazz": "music",
-        "Hip-Hop": "music", "Electronic": "music",
-        "Club Night": "nightlife", "Rooftop Bars": "nightlife", "Speakeasies": "nightlife",
-        "Comedy": "arts", "Art Openings": "arts", "Film": "arts", "Theater": "arts",
-        "Food Pop-ups": "food_drink", "Wine Tastings": "food_drink", "Brunch": "food_drink",
-        "Running": "sports", "Yoga": "sports", "Basketball": "sports",
+        "Live Music": "music", "DJ / Dance": "music", "Jazz & Soul": "music",
+        "Party": "nightlife", "Bar Hopping": "nightlife", "Rooftops": "nightlife",
+        "Comedy": "arts", "Art & Design": "arts", "Film & Theater": "arts",
+        "Brunch": "food_drink", "Food Pop-ups": "food_drink",
+        "Sports": "sports", "Fitness": "sports",
+        "Study": "other", "Networking": "other",
     }
     affinities: dict[str, float] = {}
     for tag in body.vibe_tag_names:

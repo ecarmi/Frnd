@@ -30,7 +30,7 @@ final class APIService: ObservableObject {
     static let shared = APIService()
 
     // Change to your machine's IP when testing on device, or localhost for simulator
-    private let baseURL = "http://localhost:8000"
+    private let baseURL = "http://10.150.119.91:8000"
     private var authToken: String? {
         get { UserDefaults.standard.string(forKey: "auth_token") }
         set { UserDefaults.standard.set(newValue, forKey: "auth_token") }
@@ -58,7 +58,7 @@ final class APIService: ObservableObject {
     ) async throws -> T {
         guard let url = URL(string: baseURL + path) else { throw APIError.invalidURL }
 
-        var req = URLRequest(url: url)
+        var req = URLRequest(url: url, timeoutInterval: 6)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -97,21 +97,21 @@ final class APIService: ObservableObject {
 
     // MARK: - Auth
 
-    func requestOTP(phone: String) async throws {
+    func requestEmailOTP(email: String) async throws {
         struct Empty: Codable {}
         let _: Empty = try await request(
-            path: "/auth/otp/request",
+            path: "/auth/email/request",
             method: "POST",
-            body: OTPRequest(phone: phone),
+            body: EmailOTPRequest(email: email),
             authenticated: false
         )
     }
 
-    func verifyOTP(phone: String, code: String) async throws -> AuthResponse {
+    func verifyEmailOTP(email: String, code: String) async throws -> AuthResponse {
         let resp: AuthResponse = try await request(
-            path: "/auth/otp/verify",
+            path: "/auth/email/verify",
             method: "POST",
-            body: OTPVerify(phone: phone, code: code),
+            body: EmailOTPVerify(email: email, code: code),
             authenticated: false
         )
         authToken = resp.accessToken
@@ -220,6 +220,15 @@ final class APIService: ObservableObject {
         )
     }
 
+    func inviteToPlan(planId: String, userIds: [String]) async throws -> Plan {
+        struct InviteBody: Encodable { let user_ids: [String] }
+        return try await request(
+            path: "/plans/\(planId)/invite",
+            method: "POST",
+            body: InviteBody(user_ids: userIds)
+        )
+    }
+
     func updatePlanStatus(planId: String, status: PlanStatus) async throws -> Plan {
         struct StatusBody: Encodable { let status: PlanStatus }
         return try await request(
@@ -255,6 +264,10 @@ final class APIService: ObservableObject {
         try await request(path: "/users/me/saved")
     }
 
+    func fetchAttendedEvents() async throws -> [Event] {
+        try await request(path: "/users/me/attended")
+    }
+
     func completeOnboarding(vibeTagNames: [String]) async throws -> User {
         struct OnboardingBody: Encodable { let vibe_tag_names: [String] }
         return try await request(
@@ -263,7 +276,6 @@ final class APIService: ObservableObject {
             body: OnboardingBody(vibe_tag_names: vibeTagNames)
         )
     }
-}
 
     // MARK: - Groups
 

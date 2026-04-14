@@ -1,0 +1,150 @@
+{
+  "project": "Frnd",
+  "description": "Hyperlocal event discovery and social planning iOS app",
+  "stack": {
+    "ios": "SwiftUI (iOS 17+)",
+    "backend": "FastAPI + SQLAlchemy + PostgreSQL + Redis",
+    "infrastructure": "Docker Compose (local), undeployed (cloud)"
+  },
+  "last_updated": "2026-04-13",
+  "notes": "Auth migrated from phone/SMS to email-based OTP. Carpooling demoted to future idea.",
+
+  "areas": {
+
+    "product_design": {
+      "label": "Product & Design",
+      "items": [
+        { "id": "pd-1", "status": "done", "title": "Product specification", "notes": "pulse-product-specification.html" },
+        { "id": "pd-2", "status": "done", "title": "Design system", "notes": "Color palette, typography, spacing, component library — DesignSystem.swift" },
+        { "id": "pd-3", "status": "done", "title": "All core screens designed and built" },
+        { "id": "pd-4", "status": "not_started", "title": "Design review / user testing", "notes": "No real users have seen the app yet" }
+      ]
+    },
+
+    "ios_core": {
+      "label": "iOS — Core Infrastructure",
+      "items": [
+        { "id": "ios-c1", "status": "done", "title": "Data models", "notes": "Models.swift — User, Event, Venue, Plan, Message, RSVP, Friendship, TasteProfile, Group, ActivityPost, Carpool and all enums" },
+        { "id": "ios-c2", "status": "done", "title": "APIService — typed async/await HTTP client", "notes": "Covers all endpoints: auth, feed, events, plans, users, groups, activities, carpools" },
+        { "id": "ios-c3", "status": "done", "title": "AppState — global auth/session state" },
+        { "id": "ios-c4", "status": "done", "title": "Dev bypass (code 000000 when backend unreachable)" },
+        { "id": "ios-c5", "status": "not_started", "title": "Local persistence / caching", "notes": "Every launch re-fetches everything. No SwiftData or UserDefaults caching." },
+        { "id": "ios-c6", "status": "not_started", "title": "Push notifications (APNs)", "notes": "No APNs integration. No alerts for plan messages, RSVPs, carpool confirmations." }
+      ]
+    },
+
+    "ios_screens": {
+      "label": "iOS — Screens",
+      "items": [
+        { "id": "ios-s1",  "status": "done",        "title": "Onboarding — email → OTP → name → vibes", "notes": "Migrated from phone to email OTP. Dev bypass: any email + code 000000." },
+        { "id": "ios-s2",  "status": "done",        "title": "Feed — scrollable cards, RSVP, save, AI reason chip, time filters, infinite scroll" },
+        { "id": "ios-s3",  "status": "done",        "title": "Event Detail — map, RSVP, friend avatars, price" },
+        { "id": "ios-s4",  "status": "done",        "title": "Map tab — event pins, user location" },
+        { "id": "ios-s5",  "status": "done",        "title": "Search / Explore — category filters, trending, text search" },
+        { "id": "ios-s6",  "status": "done",        "title": "Plans list + detail — voting, chat, member status" },
+        { "id": "ios-s7",  "status": "done",        "title": "Create Plan sheet" },
+        { "id": "ios-s8",  "status": "done",        "title": "Profile — saved events, friends list, attended tab" },
+        { "id": "ios-s9",  "status": "done",        "title": "Groups — list, detail, create, join by invite code" },
+        { "id": "ios-s10", "status": "done",        "title": "Activity Posts / LFG — feed, post card with join/leave, create sheet" },
+        { "id": "ios-s11", "status": "future",       "title": "Carpool section in Plan Detail — offer ride, request seat", "notes": "Demoted to future idea. UI and API exist but not prioritized." },
+        { "id": "ios-s12", "status": "done",        "title": "Invite friends to plan", "notes": "InviteFriendsSheet with multi-select checklist. Calls POST /plans/{id}/invite." },
+        { "id": "ios-s13", "status": "incomplete",  "title": "Real-time plan chat", "notes": "WebSocket endpoint exists on backend but iOS uses HTTP only. Messages require manual send to appear." },
+        { "id": "ios-s14", "status": "not_started", "title": "Friend discovery / add friends UI", "notes": "No way to find or add friends in-app. Friendships only exist via seed data." },
+        { "id": "ios-s15", "status": "not_started", "title": "Profile photo upload", "notes": "avatar_url field exists but no upload UI or storage backend." },
+        { "id": "ios-s16", "status": "future",       "title": "Carpool driver approval UI", "notes": "Future idea — deferred with carpooling feature." },
+        { "id": "ios-s17", "status": "not_started", "title": "Group-scoped events", "notes": "group_id exists on Event model but no UI to create or view group-only events." },
+        { "id": "ios-s18", "status": "done",        "title": "Attended events in Profile", "notes": "Backend GET /users/me/attended (past RSVPs with status=going) + ProfileViewModel.fetchAttendedEvents() wired up." },
+        { "id": "ios-s19", "status": "not_started", "title": "Settings screen", "notes": "No notification preferences, account deletion, blocked users, etc." },
+        { "id": "ios-s20", "status": "not_started", "title": "Error/failure states", "notes": "Most API errors are silently swallowed. No user-facing feedback when actions fail." }
+      ]
+    },
+
+    "backend_core": {
+      "label": "Backend — Core Infrastructure",
+      "items": [
+        { "id": "be-c1", "status": "done",        "title": "FastAPI app with async SQLAlchemy + PostgreSQL + Redis" },
+        { "id": "be-c2", "status": "done",        "title": "All database models", "notes": "User, Venue, Event, RSVP, Friendship, TasteProfile, Plan, PlanMember, Message, SavedEvent, Group, GroupMembership, ActivityPost, ActivityParticipant, Carpool, CarpoolPassenger, OTPCode" },
+        { "id": "be-c3", "status": "done",        "title": "Auth — email OTP request/verify, JWT tokens", "notes": "Email-based OTP (migrated from phone/SMS). Dev bypass: code 000000 accepted in debug mode." },
+        { "id": "be-c4", "status": "done",        "title": "Feed ranking algorithm", "notes": "Cosine similarity (40%) + social score (35%) + temporal decay (15%) + trending (10%)" },
+        { "id": "be-c5", "status": "done",        "title": "All API routers", "notes": "auth, users, events, feed, plans, feedback, groups, activities, carpools" },
+        { "id": "be-c6", "status": "done",        "title": "Docker Compose for local dev", "notes": "postgres + redis + api, one-command startup" },
+        { "id": "be-c7", "status": "done",        "title": "Seed script with Chicago test data", "notes": "Updated to use email-based users. Primary test user: ecarmi@uchicago.edu" },
+        { "id": "be-c8", "status": "done",        "title": "Dev OTP bypass (code 000000)", "notes": "iOS bypasses OTP locally in DEBUG builds. Backend also accepts 000000 in dev." },
+        { "id": "be-c9", "status": "done",        "title": "Database migrations (Alembic)", "notes": "alembic.ini + env.py (async) + full initial migration 0001_initial_schema.py. Run: cd backend && alembic upgrade head" },
+        { "id": "be-c10","status": "not_started", "title": "Rate limiting", "notes": "OTP endpoint is especially exposed. No slowdown/lockout on repeated attempts." },
+        { "id": "be-c11","status": "not_started", "title": "Background task queue", "notes": "No Celery/ARQ worker. Things like OTP cleanup, taste profile updates run inline or not at all." },
+        { "id": "be-c12","status": "not_started", "title": "Redis pub/sub for real-time chat", "notes": "WebSocket uses in-memory dict. Doesn't work across multiple API instances." }
+      ]
+    },
+
+    "backend_features": {
+      "label": "Backend — Features",
+      "items": [
+        { "id": "be-f1", "status": "not_started", "title": "Event ingestion pipeline", "notes": "No real events beyond seed data. Needs Ticketmaster/Eventbrite/etc. integration or admin upload flow." },
+        { "id": "be-f2", "status": "not_started", "title": "Full-text event search", "notes": "Current search is SQL LIKE. No Postgres tsvector or external search engine." },
+        { "id": "be-f3", "status": "not_started", "title": "Taste profile updates from swipes", "notes": "Swipes are recorded in feedback table but taste profile vector is never updated from them." },
+        { "id": "be-f4", "status": "not_started", "title": "Image upload / storage", "notes": "No upload endpoint. No S3/Cloudflare R2 integration." },
+        { "id": "be-f5", "status": "not_started", "title": "Twilio SMS integration", "notes": "Code path exists but Twilio credentials not configured. OTP only prints to console." },
+        { "id": "be-f6", "status": "not_started", "title": "Push notification delivery", "notes": "No APNs/Firebase integration on backend side." },
+        { "id": "be-f7", "status": "not_started", "title": "Admin panel / event moderation", "notes": "No way to manage events, users, or reported content without direct DB access." },
+        { "id": "be-f8", "status": "incomplete",  "title": "Backend: fix groups.py relationship name", "notes": "Fixed: was using Group.memberships, corrected to Group.members to match model definition." }
+      ]
+    },
+
+    "future_ideas": {
+      "label": "Future Ideas (not prioritized)",
+      "items": [
+        { "id": "fut-1", "title": "Carpooling", "notes": "Model, router, and iOS UI already exist but deprioritized. Driver offers seats, passengers claim them, driver approval flow." },
+        { "id": "fut-2", "title": "Real-time plan chat via WebSocket", "notes": "WebSocket endpoint exists on backend (in-memory). Needs Redis pub/sub for multi-instance support and iOS WebSocket client." },
+        { "id": "fut-3", "title": "Group-scoped events", "notes": "group_id column exists on Event model. Needs create-event flow + group-filtered feed slice." },
+        { "id": "fut-4", "title": "Friend discovery", "notes": "No in-app way to find/add friends. Could use contacts, QR codes, or search by name." }
+      ]
+    },
+
+    "testing": {
+      "label": "Testing",
+      "items": [
+        { "id": "test-1", "status": "not_started", "title": "iOS unit tests" },
+        { "id": "test-2", "status": "not_started", "title": "iOS UI tests (XCUITest)" },
+        { "id": "test-3", "status": "not_started", "title": "Backend unit tests (pytest)" },
+        { "id": "test-4", "status": "not_started", "title": "Backend integration tests against real DB" },
+        { "id": "test-5", "status": "not_started", "title": "End-to-end tests" }
+      ]
+    },
+
+    "devops_deployment": {
+      "label": "DevOps & Deployment",
+      "items": [
+        { "id": "ops-1", "status": "not_started", "title": "Cloud deployment (API)", "notes": "Candidates: Railway, Render, Fly.io, AWS ECS" },
+        { "id": "ops-2", "status": "not_started", "title": "Managed PostgreSQL", "notes": "Candidates: Supabase, Neon, RDS, Railway" },
+        { "id": "ops-3", "status": "not_started", "title": "Managed Redis", "notes": "Candidates: Upstash, Redis Cloud, Railway" },
+        { "id": "ops-4", "status": "not_started", "title": "Environment secrets management", "notes": "SECRET_KEY, Twilio creds, etc. currently hardcoded or in docker-compose.yml" },
+        { "id": "ops-5", "status": "not_started", "title": "CI/CD pipeline", "notes": "No GitHub Actions. No automated build/test on push." },
+        { "id": "ops-6", "status": "not_started", "title": "Logging / observability", "notes": "No structured logging, no error tracking (Sentry), no metrics." },
+        { "id": "ops-7", "status": "not_started", "title": "iOS staging vs production environments", "notes": "APIService.swift has one hardcoded baseURL pointing to localhost." }
+      ]
+    },
+
+    "app_store": {
+      "label": "App Store",
+      "items": [
+        { "id": "as-1", "status": "not_started", "title": "Apple Developer account enrolled" },
+        { "id": "as-2", "status": "not_started", "title": "Bundle ID registered (com.yourname.frnd)" },
+        { "id": "as-3", "status": "not_started", "title": "App icons + launch screen" },
+        { "id": "as-4", "status": "not_started", "title": "Provisioning profiles + signing configured" },
+        { "id": "as-5", "status": "not_started", "title": "TestFlight build" },
+        { "id": "as-6", "status": "not_started", "title": "App Store listing (screenshots, description, privacy policy)" },
+        { "id": "as-7", "status": "not_started", "title": "App Store review submission" }
+      ]
+    }
+
+  },
+
+  "status_legend": {
+    "done":        "Fully implemented and working",
+    "incomplete":  "Built but has a known gap or bug",
+    "in_progress": "Currently being worked on",
+    "not_started": "Not yet begun",
+    "future":      "Deprioritized — may be revisited later"
+  }
+}

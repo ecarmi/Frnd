@@ -20,8 +20,8 @@ final class ActivityViewModel: ObservableObject {
     }
 
     func leave(id: String) async throws {
-        let updated = try await APIService.shared.leaveActivity(id: id)
-        replace(updated)
+        try await APIService.shared.leaveActivity(id: id)
+        posts.removeAll { $0.id == id }
     }
 
     private func replace(_ post: ActivityPost) {
