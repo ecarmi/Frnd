@@ -42,9 +42,7 @@ struct PlansView: View {
                     // Segment control
                     segmentPicker
                         .padding(.horizontal, Spacing.base)
-                        .padding(.top, Spacing.sm)
-
-                    Divider().overlay(Color.bgBorder)
+                        .padding(.vertical, Spacing.sm)
 
                     // Content
                     switch selectedSegment {
@@ -91,23 +89,26 @@ struct PlansView: View {
     }
 
     private var segmentPicker: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.sm) {
             ForEach(Array(["Plans", "Groups", "LFG"].enumerated()), id: \.offset) { idx, label in
-                Button(label) {
+                Button {
                     withAnimation(.spring(response: 0.25)) { selectedSegment = idx }
+                } label: {
+                    Text(label)
+                        .font(.captionSmall)
+                        .foregroundColor(selectedSegment == idx ? .white : .textSecondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(selectedSegment == idx ? Color.ember : Color.bgRaised)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(selectedSegment == idx ? Color.clear : Color.bgBorder)
+                        )
                 }
-                .font(selectedSegment == idx ? .bodyMedium.bold() : .bodyMedium)
-                .foregroundColor(selectedSegment == idx ? .ember : .textSecondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .overlay(
-                    Rectangle()
-                        .frame(height: 2)
-                        .foregroundColor(selectedSegment == idx ? Color.ember : Color.clear)
-                        .padding(.horizontal, 16),
-                    alignment: .bottom
-                )
+                .buttonStyle(.plain)
             }
+            Spacer()
         }
     }
 

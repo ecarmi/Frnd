@@ -26,6 +26,7 @@ struct ProfileView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = ProfileViewModel()
     @State private var showSettings = false
+    @State private var showEditName = false
     @State private var selectedTab: ProfileTab = .saved
 
     enum ProfileTab: String, CaseIterable {
@@ -64,6 +65,9 @@ struct ProfileView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
+        .sheet(isPresented: $showEditName) {
+            EditNameSheet()
+        }
         .task { await viewModel.load() }
     }
 
@@ -79,9 +83,16 @@ struct ProfileView: View {
             .overlay(Circle().strokeBorder(Color.ember, lineWidth: 2))
 
             VStack(spacing: 4) {
-                Text(appState.currentUser?.name ?? "Your Profile")
-                    .font(.headingLarge)
-                    .foregroundColor(.textPrimary)
+                HStack(spacing: 6) {
+                    Text(appState.currentUser?.name ?? "Your Profile")
+                        .font(.headingLarge)
+                        .foregroundColor(.textPrimary)
+                    Button { showEditName = true } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.textTertiary)
+                    }
+                }
                 if let email = appState.currentUser?.email {
                     Text(email)
                         .font(.captionMedium)
@@ -509,5 +520,67 @@ private struct PrivacyPolicyView: View {
                 .font(.bodyMedium)
                 .foregroundColor(.textSecondary)
         }
+    }
+}
+
+// MARK: - Edit Name Sheet
+
+private struct EditNameSheet: View {
+    @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String = ""
+    @State private var isLoading = false
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.bgPrimary.ignoresSafeArea()
+                VStack(spacing: Spacing.xl) {
+                    TextField("Display name", text: $name)
+                        .font(.bodyLarge)
+                        .foregroundColor(.textPrimary)
+                        .padding()
+                        .background(Color.bgRaised)
+                        .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+                        .overlay(RoundedRectangle(cornerRadius: Radius.md).strokeBorder(Color.bgBorder))
+
+                    if let error = error {
+                        Text(error).foregroundColor(.rose).font(.captionMedium)
+                    }
+
+                    Spacer()
+                }
+                .padding(Spacing.xl)
+            }
+            .navigationTitle("Edit Name")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }.foregroundColor(.textSecondary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") {
+                        Task {
+                            isLoading = true
+                            do {
+                                let updated = try await APIService.shared.updateProfile(
+                                    name: name.trimmingCharacters(in: .whitespaces),
+                                    vibeTagIds: nil
+                                )
+                                appState.setUser(updated)
+                                dismiss()
+                            } catch {
+                                self.error = error.localizedDescription
+                            }
+                            isLoading = false
+                        }
+                    }
+                    .foregroundColor(.ember)
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
+                }
+            }
+        }
+        .onAppear { name = appState.currentUser?.name ?? "" }
     }
 }

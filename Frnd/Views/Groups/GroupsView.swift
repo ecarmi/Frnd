@@ -207,9 +207,13 @@ struct GroupDetailView: View {
                 .padding(Spacing.base)
             }
         }
-        .navigationTitle(group.name)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(group.name)
+                    .font(.headingMedium)
+                    .foregroundColor(.textPrimary)
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button("Post Activity") { showCreateActivity = true }

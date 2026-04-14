@@ -2,9 +2,10 @@ import SwiftUI
 
 struct FeedView: View {
     @StateObject private var viewModel = FeedViewModel()
-    @State private var selectedFilter: TimeFilter = .tonight
+    @State private var selectedFilter: TimeFilter = .all
 
     enum TimeFilter: String, CaseIterable {
+        case all     = "All"
         case tonight = "Tonight"
         case thisWeek = "This Week"
         case weekend = "Weekend"
@@ -14,6 +15,9 @@ struct FeedView: View {
             let now = Date()
 
             switch self {
+            case .all:
+                return true
+
             case .tonight:
                 return cal.isDateInToday(date) && date >= now
 

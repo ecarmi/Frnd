@@ -45,6 +45,8 @@ struct PlanDetailView: View {
                 if plan.status != .archived {
                     messageInput
                 }
+
+                Color.clear.frame(height: 88)
             }
         }
         .navigationTitle(plan.title)
