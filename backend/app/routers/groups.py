@@ -27,7 +27,7 @@ def _member_out(m: GroupMembership) -> GroupMemberOut:
 async def _load_group(group_id: str, db: AsyncSession) -> Group | None:
     result = await db.execute(
         select(Group)
-        .options(selectinload(Group.members).selectinload(GroupMembership.user))
+        .options(selectinload(Group.members).selectinload(GroupMembership.user).selectinload(User.taste_profile))
         .where(Group.id == group_id)
     )
     return result.scalar_one_or_none()
@@ -56,7 +56,7 @@ async def list_my_groups(
 ):
     result = await db.execute(
         select(Group)
-        .options(selectinload(Group.members).selectinload(GroupMembership.user))
+        .options(selectinload(Group.members).selectinload(GroupMembership.user).selectinload(User.taste_profile))
         .join(Group.members)
         .where(GroupMembership.user_id == current_user.id)
         .order_by(Group.created_at.desc())
@@ -114,7 +114,7 @@ async def join_by_invite(
 ):
     result = await db.execute(
         select(Group)
-        .options(selectinload(Group.members).selectinload(GroupMembership.user))
+        .options(selectinload(Group.members).selectinload(GroupMembership.user).selectinload(User.taste_profile))
         .where(Group.invite_code == body.invite_code)
     )
     group = result.scalar_one_or_none()

@@ -71,7 +71,7 @@ async def list_plans(
     result = await db.execute(
         select(Plan)
         .options(
-            selectinload(Plan.members).selectinload(PlanMember.user),
+            selectinload(Plan.members).selectinload(PlanMember.user).selectinload(User.taste_profile),
             selectinload(Plan.messages).selectinload(Message.sender),
         )
         .join(Plan.members)
@@ -116,7 +116,7 @@ async def create_plan(
     result = await db.execute(
         select(Plan)
         .options(
-            selectinload(Plan.members).selectinload(PlanMember.user),
+            selectinload(Plan.members).selectinload(PlanMember.user).selectinload(User.taste_profile),
             selectinload(Plan.messages).selectinload(Message.sender),
         )
         .where(Plan.id == plan.id)
@@ -134,7 +134,7 @@ async def get_plan(
     result = await db.execute(
         select(Plan)
         .options(
-            selectinload(Plan.members).selectinload(PlanMember.user),
+            selectinload(Plan.members).selectinload(PlanMember.user).selectinload(User.taste_profile),
             selectinload(Plan.messages).selectinload(Message.sender),
         )
         .where(Plan.id == plan_id)
@@ -161,7 +161,7 @@ async def invite_to_plan(
     result = await db.execute(
         select(Plan)
         .options(
-            selectinload(Plan.members).selectinload(PlanMember.user),
+            selectinload(Plan.members).selectinload(PlanMember.user).selectinload(User.taste_profile),
             selectinload(Plan.messages).selectinload(Message.sender),
         )
         .where(Plan.id == plan_id)
@@ -192,7 +192,7 @@ async def invite_to_plan(
     result = await db.execute(
         select(Plan)
         .options(
-            selectinload(Plan.members).selectinload(PlanMember.user),
+            selectinload(Plan.members).selectinload(PlanMember.user).selectinload(User.taste_profile),
             selectinload(Plan.messages).selectinload(Message.sender),
         )
         .where(Plan.id == plan_id)
@@ -211,7 +211,7 @@ async def vote(
     result = await db.execute(
         select(Plan)
         .options(
-            selectinload(Plan.members).selectinload(PlanMember.user),
+            selectinload(Plan.members).selectinload(PlanMember.user).selectinload(User.taste_profile),
             selectinload(Plan.messages),
         )
         .where(Plan.id == plan_id)
@@ -235,7 +235,7 @@ async def vote(
     result = await db.execute(
         select(Plan)
         .options(
-            selectinload(Plan.members).selectinload(PlanMember.user),
+            selectinload(Plan.members).selectinload(PlanMember.user).selectinload(User.taste_profile),
             selectinload(Plan.messages).selectinload(Message.sender),
         )
         .where(Plan.id == plan_id)
@@ -290,7 +290,7 @@ async def update_status(
     result = await db.execute(
         select(Plan)
         .options(
-            selectinload(Plan.members).selectinload(PlanMember.user),
+            selectinload(Plan.members).selectinload(PlanMember.user).selectinload(User.taste_profile),
             selectinload(Plan.messages).selectinload(Message.sender),
         )
         .where(Plan.id == plan_id)
