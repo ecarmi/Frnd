@@ -1,5 +1,7 @@
 import SwiftUI
 import Combine
+import UserNotifications
+import CoreLocation
 
 @MainActor
 final class ProfileViewModel: ObservableObject {
@@ -80,10 +82,15 @@ struct ProfileView: View {
                 Text(appState.currentUser?.name ?? "Your Profile")
                     .font(.headingLarge)
                     .foregroundColor(.textPrimary)
-                if let phone = appState.currentUser?.phone {
-                    Text(phone)
+                if let email = appState.currentUser?.email {
+                    Text(email)
                         .font(.captionMedium)
                         .foregroundColor(.textSecondary)
+                }
+                if let uni = appState.currentUser?.university {
+                    Text(uni)
+                        .font(.captionSmall)
+                        .foregroundColor(.textTertiary)
                 }
             }
 
@@ -94,6 +101,21 @@ struct ProfileView: View {
                 StatView(value: "\(viewModel.friends.count)", label: "Friends")
             }
             .padding(.top, Spacing.sm)
+
+            // Invite button
+            ShareLink(item: "Join me on Frnd — the app for discovering campus events and making plans with friends. Download it here: https://frnd.app") {
+                HStack(spacing: 6) {
+                    Image(systemName: "person.badge.plus")
+                    Text("Invite Friends")
+                }
+                .font(.captionMedium)
+                .foregroundColor(.ember)
+                .padding(.horizontal, Spacing.base)
+                .padding(.vertical, 8)
+                .background(Color.ember.opacity(0.1))
+                .clipShape(Capsule())
+                .overlay(Capsule().strokeBorder(Color.ember.opacity(0.3)))
+            }
         }
         .padding(.horizontal, Spacing.base)
         .padding(.top, Spacing.xl)
@@ -306,22 +328,80 @@ struct SettingsView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
 
+    @State private var notificationsEnabled = false
+    @State private var locationStatus: CLAuthorizationStatus = .notDetermined
+    @State private var showPrivacy = false
+
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.bgPrimary.ignoresSafeArea()
                 List {
-                    Section {
-                        settingsRow(icon: "bell.fill", label: "Notifications", color: .ember)
-                        settingsRow(icon: "location.fill", label: "Location", color: .teal)
-                        settingsRow(icon: "music.note", label: "Connect Spotify", color: .violet)
+                    Section("Permissions") {
+                        // Notifications
+                        HStack {
+                            Label("Notifications", systemImage: "bell.fill")
+                                .foregroundColor(.textPrimary)
+                            Spacer()
+                            if notificationsEnabled {
+                                Text("On")
+                                    .font(.captionMedium)
+                                    .foregroundColor(.teal)
+                            } else {
+                                Button("Enable") {
+                                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in
+                                        Task { @MainActor in checkNotificationStatus() }
+                                    }
+                                }
+                                .font(.captionMedium)
+                                .foregroundColor(.ember)
+                            }
+                        }
+
+                        // Location
+                        HStack {
+                            Label("Location", systemImage: "location.fill")
+                                .foregroundColor(.textPrimary)
+                            Spacer()
+                            switch locationStatus {
+                            case .authorizedWhenInUse, .authorizedAlways:
+                                Text("On")
+                                    .font(.captionMedium)
+                                    .foregroundColor(.teal)
+                            case .denied, .restricted:
+                                Button("Open Settings") {
+                                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                                        UIApplication.shared.open(url)
+                                    }
+                                }
+                                .font(.captionMedium)
+                                .foregroundColor(.ember)
+                            default:
+                                Text("Not set")
+                                    .font(.captionMedium)
+                                    .foregroundColor(.textTertiary)
+                            }
+                        }
                     }
                     .listRowBackground(Color.bgRaised)
 
-                    Section {
-                        settingsRow(icon: "person.badge.shield.checkmark", label: "Privacy", color: .gold)
-                        settingsRow(icon: "questionmark.circle", label: "Help & Support", color: .textSecondary)
-                        settingsRow(icon: "info.circle", label: "About Frnd", color: .textSecondary)
+                    Section("Account") {
+                        Button { showPrivacy = true } label: {
+                            Label("Privacy Policy", systemImage: "person.badge.shield.checkmark")
+                                .foregroundColor(.textPrimary)
+                        }
+                        Link(destination: URL(string: "mailto:support@frnd.app")!) {
+                            Label("Help & Support", systemImage: "questionmark.circle")
+                                .foregroundColor(.textPrimary)
+                        }
+                        HStack {
+                            Label("Version", systemImage: "info.circle")
+                                .foregroundColor(.textPrimary)
+                            Spacer()
+                            Text("1.0.0")
+                                .font(.captionMedium)
+                                .foregroundColor(.textTertiary)
+                        }
                     }
                     .listRowBackground(Color.bgRaised)
 
@@ -346,12 +426,88 @@ struct SettingsView: View {
                         .foregroundColor(.ember)
                 }
             }
+            .sheet(isPresented: $showPrivacy) { PrivacyPolicyView() }
+            .task { checkNotificationStatus(); checkLocationStatus() }
         }
     }
 
-    private func settingsRow(icon: String, label: String, color: Color) -> some View {
-        Label(label, systemImage: icon)
-            .foregroundColor(.textPrimary)
-            .font(.bodyLarge)
+    private func checkNotificationStatus() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            Task { @MainActor in
+                notificationsEnabled = settings.authorizationStatus == .authorized
+            }
+        }
+    }
+
+    private func checkLocationStatus() {
+        locationStatus = CLLocationManager().authorizationStatus
+    }
+}
+
+// MARK: - Privacy Policy View
+
+private struct PrivacyPolicyView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.xl) {
+                    Text("Last updated: April 2026")
+                        .font(.captionMedium)
+                        .foregroundColor(.textTertiary)
+
+                    policySection("Information We Collect",
+                        """
+                        We collect the information you provide when creating your account, including your .edu email address, name, and interests. We also collect your device location when you grant permission, used solely to show nearby events.
+                        """)
+
+                    policySection("How We Use Your Information",
+                        """
+                        Your information is used to personalize your event feed, connect you with friends, and improve the app experience. We do not sell your personal data to third parties.
+                        """)
+
+                    policySection("Location Data",
+                        """
+                        Location is used only while the app is in use to display nearby events and is never stored or shared with other users without your consent.
+                        """)
+
+                    policySection("Data Sharing",
+                        """
+                        Your name and university are visible to other verified .edu users on the platform. Your email address is never displayed publicly. We do not share your data with advertisers.
+                        """)
+
+                    policySection("Data Retention",
+                        """
+                        You may delete your account at any time by contacting support@frnd.app. Upon deletion, your personal data is removed within 30 days.
+                        """)
+
+                    policySection("Contact",
+                        """
+                        Questions about this policy? Email us at privacy@frnd.app.
+                        """)
+                }
+                .padding(Spacing.base)
+            }
+            .background(Color.bgPrimary.ignoresSafeArea())
+            .navigationTitle("Privacy Policy")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }.foregroundColor(.ember)
+                }
+            }
+        }
+    }
+
+    private func policySection(_ title: String, _ body: String) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text(title)
+                .font(.headingSmall)
+                .foregroundColor(.textPrimary)
+            Text(body)
+                .font(.bodyMedium)
+                .foregroundColor(.textSecondary)
+        }
     }
 }

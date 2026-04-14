@@ -7,7 +7,7 @@
     "infrastructure": "Docker Compose (local), Railway (deployment in progress)"
   },
   "last_updated": "2026-04-14",
-  "notes": "Auth migrated from phone/SMS to email-based OTP. Carpooling demoted to future idea. Railway deployment in progress.",
+  "notes": "Auth migrated from phone/SMS to email-based OTP. Carpooling demoted to future idea. Railway deployed and working. Backend live at frnd-production.up.railway.app. Map functional with live filters and location. Profile updated with invite, notifications, location, privacy. Enum type mismatch fixed across all routers.",
 
   "areas": {
 
@@ -39,7 +39,7 @@
         { "id": "ios-s1",  "status": "done",        "title": "Onboarding — email → OTP → name → vibes", "notes": "Email OTP auth. Dev bypass: ecarmi@uchicago.edu + 000000. Vibe tags consolidated to 15, no scroll, min 3 selections." },
         { "id": "ios-s2",  "status": "done",        "title": "Feed — scrollable cards, RSVP, save, AI reason chip, time filters, infinite scroll" },
         { "id": "ios-s3",  "status": "done",        "title": "Event Detail — map, RSVP, friend avatars, price" },
-        { "id": "ios-s4",  "status": "done",        "title": "Map tab — event pins, user location" },
+        { "id": "ios-s4",  "status": "done",        "title": "Map tab — event pins, user location, working time/category filters, reloads on pan" },
         { "id": "ios-s5",  "status": "done",        "title": "Search / Explore — category filters, trending, text search" },
         { "id": "ios-s6",  "status": "done",        "title": "Plans list + detail — voting, chat, member status" },
         { "id": "ios-s7",  "status": "done",        "title": "Create Plan sheet" },
@@ -48,13 +48,13 @@
         { "id": "ios-s10", "status": "done",        "title": "Activity Posts / LFG — feed, post card with join/leave, create sheet" },
         { "id": "ios-s11", "status": "future",       "title": "Carpool section in Plan Detail — offer ride, request seat", "notes": "Demoted to future idea. UI and API exist but not prioritized." },
         { "id": "ios-s12", "status": "done",        "title": "Invite friends to plan", "notes": "InviteFriendsSheet with multi-select checklist. Calls POST /plans/{id}/invite." },
-        { "id": "ios-s13", "status": "incomplete",  "title": "Real-time plan chat", "notes": "WebSocket endpoint exists on backend but iOS uses HTTP only. Messages require manual send to appear." },
+        { "id": "ios-s13", "status": "incomplete",  "title": "Real-time plan chat", "notes": "WebSocket endpoint exists on backend but iOS uses HTTP only. Messages require manual refresh to appear." },
         { "id": "ios-s14", "status": "not_started", "title": "Friend discovery / add friends UI", "notes": "No way to find or add friends in-app. Friendships only exist via seed data." },
         { "id": "ios-s15", "status": "not_started", "title": "Profile photo upload", "notes": "avatar_url field exists but no upload UI or storage backend." },
         { "id": "ios-s16", "status": "future",       "title": "Carpool driver approval UI", "notes": "Future idea — deferred with carpooling feature." },
         { "id": "ios-s17", "status": "not_started", "title": "Group-scoped events", "notes": "group_id exists on Event model but no UI to create or view group-only events." },
         { "id": "ios-s18", "status": "done",        "title": "Attended events in Profile", "notes": "Backend GET /users/me/attended (past RSVPs with status=going) + ProfileViewModel.fetchAttendedEvents() wired up." },
-        { "id": "ios-s19", "status": "not_started", "title": "Settings screen", "notes": "No notification preferences, account deletion, blocked users, etc." },
+        { "id": "ios-s19", "status": "done", "title": "Settings screen", "notes": "Notifications toggle (requests permission), Location status, Privacy Policy sheet, Help link, Sign Out. Spotify removed." },
         { "id": "ios-s20", "status": "not_started", "title": "Error/failure states", "notes": "Most API errors are silently swallowed. No user-facing feedback when actions fail." }
       ]
     },
@@ -87,7 +87,9 @@
         { "id": "be-f5", "status": "not_started", "title": "Twilio SMS integration", "notes": "Code path exists but Twilio credentials not configured. OTP only prints to console." },
         { "id": "be-f6", "status": "not_started", "title": "Push notification delivery", "notes": "No APNs/Firebase integration on backend side." },
         { "id": "be-f7", "status": "not_started", "title": "Admin panel / event moderation", "notes": "No way to manage events, users, or reported content without direct DB access." },
-        { "id": "be-f8", "status": "incomplete",  "title": "Backend: fix groups.py relationship name", "notes": "Fixed: was using Group.memberships, corrected to Group.members to match model definition." }
+        { "id": "be-f8", "status": "done",  "title": "Backend bug fixes", "notes": "Fixed: Group.memberships→Group.members, feed geo query, MissingGreenlet on taste_profile lazy load in auth/onboarding/groups/plans." },
+        { "id": "be-f9", "status": "not_started", "title": "N+1 query optimization", "notes": "Groups and plans load slowly due to per-member queries. Needs batch loading review." },
+        { "id": "be-f10", "status": "not_started", "title": "Remove dev bypass before publish", "notes": "DEV_BYPASS_EMAIL and 000000 code must be removed or gated behind env flag before App Store release." }
       ]
     },
 
@@ -115,13 +117,13 @@
     "devops_deployment": {
       "label": "DevOps & Deployment",
       "items": [
-        { "id": "ops-1", "status": "in_progress",  "title": "Cloud deployment (API)", "notes": "Railway selected. Dockerfile + railway.toml configured. Blocked on Postgres provisioning issue." },
-        { "id": "ops-2", "status": "in_progress",  "title": "Managed PostgreSQL", "notes": "Railway Postgres. Volume cleanup needed before service can be recreated." },
-        { "id": "ops-3", "status": "not_started", "title": "Managed Redis", "notes": "Railway Redis — not yet added, pending Postgres fix." },
+        { "id": "ops-1", "status": "done", "title": "Cloud deployment (API)", "notes": "Railway. Live at frnd-production.up.railway.app. Auto-deploys on push to main." },
+        { "id": "ops-2", "status": "done", "title": "Managed PostgreSQL", "notes": "Railway Postgres provisioned and running. Migrations applied." },
+        { "id": "ops-3", "status": "not_started", "title": "Managed Redis", "notes": "Railway Redis — not yet added." },
         { "id": "ops-4", "status": "done",        "title": "Environment secrets management", "notes": "SECRET_KEY, DATABASE_URL, REDIS_URL set as Railway environment variables." },
         { "id": "ops-5", "status": "done",        "title": "CI/CD pipeline", "notes": "Railway auto-deploys on every git push to main." },
         { "id": "ops-6", "status": "not_started", "title": "Logging / observability", "notes": "No structured logging, no error tracking (Sentry), no metrics." },
-        { "id": "ops-7", "status": "incomplete",  "title": "iOS staging vs production environments", "notes": "APIService baseURL updated to Railway URL. No separate staging env yet." }
+        { "id": "ops-7", "status": "incomplete",  "title": "iOS staging vs production environments", "notes": "APIService baseURL pointing at Railway prod. No separate staging env yet." }
       ]
     },
 

@@ -72,6 +72,7 @@ struct GroupsView: View {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 22))
                             .foregroundColor(.ember)
+                            .frame(width: 28, height: 28)
                     }
                 }
             }
@@ -134,11 +135,11 @@ struct GroupRowView: View {
             ZStack {
                 Circle()
                     .fill(Color.violet.opacity(0.2))
-                    .frame(width: 48, height: 48)
                 Text(String(group.name.prefix(1)))
                     .font(.headingMedium)
                     .foregroundColor(.violet)
             }
+            .frame(width: 48, height: 48)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
