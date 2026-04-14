@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -72,7 +73,10 @@ async def verify_email_otp(body: OTPVerify, db: AsyncSession = Depends(get_db)):
             await db.flush()
             db.add(TasteProfile(user_id=user.id))
         await db.commit()
-        await db.refresh(user)
+        user_result = await db.execute(
+            select(User).where(User.email == email).options(selectinload(User.taste_profile))
+        )
+        user = user_result.scalar_one()
         return AuthResponse(access_token=create_access_token(user.id), user=user)
 
     # Normal flow
@@ -106,7 +110,10 @@ async def verify_email_otp(body: OTPVerify, db: AsyncSession = Depends(get_db)):
         db.add(TasteProfile(user_id=user.id))
 
     await db.commit()
-    await db.refresh(user)
+    user_result = await db.execute(
+        select(User).where(User.email == email).options(selectinload(User.taste_profile))
+    )
+    user = user_result.scalar_one()
 
     return AuthResponse(access_token=create_access_token(user.id), user=user)
 
