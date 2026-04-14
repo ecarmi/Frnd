@@ -82,7 +82,9 @@ struct PlansView: View {
                 }
             }
         }
-        .sheet(isPresented: $showCreatePlan) {
+        .sheet(isPresented: $showCreatePlan, onDismiss: {
+            Task { await viewModel.loadPlans() }
+        }) {
             CreatePlanView(prefillEvent: nil)
         }
         .task { await viewModel.loadPlans() }

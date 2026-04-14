@@ -82,7 +82,7 @@
       "items": [
         { "id": "be-f1", "status": "not_started", "title": "Event ingestion pipeline", "notes": "No real events beyond seed data. Needs Ticketmaster/Eventbrite/etc. integration or admin upload flow." },
         { "id": "be-f2", "status": "not_started", "title": "Full-text event search", "notes": "Current search is SQL LIKE. No Postgres tsvector or external search engine." },
-        { "id": "be-f3", "status": "not_started", "title": "Taste profile updates from swipes", "notes": "Swipes are recorded in feedback table but taste profile vector is never updated from them." },
+        { "id": "be-f3", "status": "not_started", "title": "Taste profile updates from swipes", "notes": "Swipes are recorded in feedback table but taste profile vector is never updated from them. Profile screen currently shows 'Complete your vibe selection' placeholder — MUST remove sample data and wire real taste profile before launch." },
         { "id": "be-f4", "status": "not_started", "title": "Image upload / storage", "notes": "No upload endpoint. No S3/Cloudflare R2 integration." },
         { "id": "be-f5", "status": "not_started", "title": "Twilio SMS integration", "notes": "Code path exists but Twilio credentials not configured. OTP only prints to console." },
         { "id": "be-f6", "status": "not_started", "title": "Push notification delivery", "notes": "No APNs/Firebase integration on backend side." },

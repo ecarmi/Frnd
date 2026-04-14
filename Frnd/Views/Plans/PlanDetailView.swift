@@ -41,12 +41,11 @@ struct PlanDetailView: View {
                 // Messages
                 messagesList
 
-                // Input bar
-                if plan.status != .archived {
-                    messageInput
-                }
-
-                Color.clear.frame(height: 88)
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if plan.status != .archived {
+                messageInput
             }
         }
         .navigationTitle(plan.title)
@@ -62,7 +61,10 @@ struct PlanDetailView: View {
             }
         }
         .task {
-            carpools = (try? await APIService.shared.fetchCarpools(planId: plan.id)) ?? []
+            async let freshPlan = try? APIService.shared.fetchPlan(id: plan.id)
+            async let freshCarpools = try? APIService.shared.fetchCarpools(planId: plan.id)
+            if let p = await freshPlan { plan = p }
+            carpools = (await freshCarpools) ?? []
         }
     }
 
@@ -560,11 +562,23 @@ struct InviteFriendsSheet: View {
 
                 if isLoading {
                     ProgressView().tint(.ember)
-                } else if invitableFriends.isEmpty {
+                } else if friends.isEmpty {
                     VStack(spacing: Spacing.md) {
                         Image(systemName: "person.2")
                             .font(.system(size: 40))
                             .foregroundColor(.textTertiary)
+                        Text("No friends yet")
+                            .font(.headingSmall)
+                            .foregroundColor(.textPrimary)
+                        Text("Friend discovery is coming soon.")
+                            .font(.bodyMedium)
+                            .foregroundColor(.textSecondary)
+                    }
+                } else if invitableFriends.isEmpty {
+                    VStack(spacing: Spacing.md) {
+                        Image(systemName: "checkmark.circle")
+                            .font(.system(size: 40))
+                            .foregroundColor(.teal)
                         Text("Everyone's already in this plan!")
                             .font(.bodyMedium)
                             .foregroundColor(.textSecondary)

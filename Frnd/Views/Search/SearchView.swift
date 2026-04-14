@@ -133,6 +133,7 @@ struct SearchView: View {
             // Category pills
             VStack(alignment: .leading, spacing: Spacing.md) {
                 sectionLabel("Browse by Vibe")
+                    .padding(.horizontal, Spacing.base)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: Spacing.sm) {
                         categoryChip(nil, label: "All")

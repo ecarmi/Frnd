@@ -144,9 +144,8 @@ struct ProfileView: View {
                     .font(.headingSmall)
                     .foregroundColor(.textPrimary)
                 Spacer()
-                Button("Edit") {}
-                    .font(.captionMedium)
-                    .foregroundColor(.ember)
+                // TODO: wire up vibe re-selection once taste profile editing is built
+
             }
 
             if let summary = appState.currentUser?.tasteProfile?.humanReadableSummary {
@@ -154,9 +153,9 @@ struct ProfileView: View {
                     .font(.bodyMedium)
                     .foregroundColor(.textSecondary)
             } else {
-                Text("You lean toward: live music, late-night venues, $10–$30 range")
+                Text("Complete your vibe selection to see your taste profile.")
                     .font(.bodyMedium)
-                    .foregroundColor(.textSecondary)
+                    .foregroundColor(.textTertiary)
             }
 
             // Category affinity bars
