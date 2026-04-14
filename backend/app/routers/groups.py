@@ -27,14 +27,14 @@ def _member_out(m: GroupMembership) -> GroupMemberOut:
 async def _load_group(group_id: str, db: AsyncSession) -> Group | None:
     result = await db.execute(
         select(Group)
-        .options(selectinload(Group.memberships).selectinload(GroupMembership.user))
+        .options(selectinload(Group.members).selectinload(GroupMembership.user))
         .where(Group.id == group_id)
     )
     return result.scalar_one_or_none()
 
 
 def _group_out(group: Group) -> GroupOut:
-    members = [_member_out(m) for m in group.memberships]
+    members = [_member_out(m) for m in group.members]
     return GroupOut(
         id=group.id,
         name=group.name,
@@ -56,8 +56,8 @@ async def list_my_groups(
 ):
     result = await db.execute(
         select(Group)
-        .options(selectinload(Group.memberships).selectinload(GroupMembership.user))
-        .join(Group.memberships)
+        .options(selectinload(Group.members).selectinload(GroupMembership.user))
+        .join(Group.members)
         .where(GroupMembership.user_id == current_user.id)
         .order_by(Group.created_at.desc())
     )
@@ -99,7 +99,7 @@ async def get_group(
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
 
-    member_ids = {m.user_id for m in group.memberships}
+    member_ids = {m.user_id for m in group.members}
     if group.is_private and current_user.id not in member_ids:
         raise HTTPException(status_code=403, detail="Private group")
 
@@ -114,14 +114,14 @@ async def join_by_invite(
 ):
     result = await db.execute(
         select(Group)
-        .options(selectinload(Group.memberships).selectinload(GroupMembership.user))
+        .options(selectinload(Group.members).selectinload(GroupMembership.user))
         .where(Group.invite_code == body.invite_code)
     )
     group = result.scalar_one_or_none()
     if not group:
         raise HTTPException(status_code=404, detail="Invalid invite code")
 
-    member_ids = {m.user_id for m in group.memberships}
+    member_ids = {m.user_id for m in group.members}
     if current_user.id not in member_ids:
         db.add(GroupMembership(group_id=group.id, user_id=current_user.id, role=GroupRoleEnum.member))
         await db.commit()

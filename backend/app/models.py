@@ -111,9 +111,11 @@ class MessageTypeEnum(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[str]           = mapped_column(String, primary_key=True, default=new_uuid)
+    id: Mapped[str]              = mapped_column(String, primary_key=True, default=new_uuid)
+    email: Mapped[Optional[str]] = mapped_column(String(254), unique=True, nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
-    name: Mapped[str]         = mapped_column(String(120), nullable=False, default="")
+    university: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    name: Mapped[str]            = mapped_column(String(120), nullable=False, default="")
     avatar_url: Mapped[Optional[str]] = mapped_column(String(500))
     latitude: Mapped[Optional[float]]  = mapped_column(Float)
     longitude: Mapped[Optional[float]] = mapped_column(Float)
@@ -280,7 +282,7 @@ class OTPCode(Base):
     __tablename__ = "otp_codes"
 
     id: Mapped[str]       = mapped_column(String, primary_key=True, default=new_uuid)
-    phone: Mapped[str]    = mapped_column(String(20), nullable=False)
+    email: Mapped[str]    = mapped_column(String(254), nullable=False)
     code: Mapped[str]     = mapped_column(String(6), nullable=False)
     used: Mapped[bool]    = mapped_column(Boolean, default=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

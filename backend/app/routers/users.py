@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
-from ..models import User, Friendship, TasteProfile, SavedEvent, Event
+from ..models import User, Friendship, TasteProfile, SavedEvent, Event, RSVP, RSVPStatusEnum
 from ..schemas import UserOut, UserUpdate, FriendshipOut, OnboardingBody, EventOut
 from ..services.feed import build_feed_event_out
 from ..auth import get_current_user
@@ -117,6 +117,28 @@ async def get_saved_events(
         .join(SavedEvent, SavedEvent.event_id == Event.id)
         .where(SavedEvent.user_id == current_user.id)
         .order_by(SavedEvent.created_at.desc())
+    )
+    events = result.scalars().all()
+    return [await build_feed_event_out(e, current_user, db) for e in events]
+
+
+@router.get("/me/attended", response_model=list[EventOut])
+async def get_attended_events(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(Event)
+        .options(selectinload(Event.venue))
+        .join(RSVP, RSVP.event_id == Event.id)
+        .where(
+            RSVP.user_id == current_user.id,
+            RSVP.status == RSVPStatusEnum.going,
+            Event.start_time < now,
+        )
+        .order_by(Event.start_time.desc())
     )
     events = result.scalars().all()
     return [await build_feed_event_out(e, current_user, db) for e in events]

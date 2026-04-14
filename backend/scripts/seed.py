@@ -37,8 +37,9 @@ async def seed():
         # ----------------------------------------------------------------
         me = User(
             id="test-user-001",
-            phone="+15550001234",
+            email="ecarmi@uchicago.edu",
             name="Eric",
+            university="University of Chicago",
             latitude=41.7991,
             longitude=-87.5876,
             onboarding_complete=True,
@@ -57,14 +58,14 @@ async def seed():
 
         # Friend users
         friends_data = [
-            ("user-002", "Alex Chen", 41.7950, -87.5900),
-            ("user-003", "Jordan Kim", 41.8020, -87.5850),
-            ("user-004", "Sam Rivera", 41.7970, -87.5920),
-            ("user-005", "Maya Johnson", 41.8010, -87.5870),
-            ("user-006", "Tyler Brooks", 41.7940, -87.5880),
+            ("user-002", "Alex Chen",    "alexchen@uchicago.edu",    41.7950, -87.5900),
+            ("user-003", "Jordan Kim",   "jordankim@uchicago.edu",   41.8020, -87.5850),
+            ("user-004", "Sam Rivera",   "srivera@uchicago.edu",     41.7970, -87.5920),
+            ("user-005", "Maya Johnson", "mayaj@uchicago.edu",       41.8010, -87.5870),
+            ("user-006", "Tyler Brooks", "tbrooks@uchicago.edu",     41.7940, -87.5880),
         ]
-        for uid, fname, lat, lng in friends_data:
-            u = User(id=uid, phone=f"+1555000{uid[-3:]}", name=fname,
+        for uid, fname, femail, lat, lng in friends_data:
+            u = User(id=uid, email=femail, name=fname, university="University of Chicago",
                      latitude=lat, longitude=lng, onboarding_complete=True)
             db.add(u)
             db.add(TasteProfile(user_id=uid, category_affinities={"music": 0.7}, genre_weights={}))
@@ -246,7 +247,7 @@ async def seed():
         token = create_access_token("test-user-001")
         print("\n✅ Seed complete!")
         print(f"\n📱 Test user token (paste into APIService.swift for dev):\n   {token}\n")
-        print("Or use the dev bypass: phone=anything, code=000000\n")
+        print("Or use the dev bypass: email=ecarmi@uchicago.edu, code=000000\n")
 
 
 if __name__ == "__main__":

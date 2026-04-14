@@ -7,7 +7,7 @@ import json
 from ..database import get_db
 from ..models import User, Plan, PlanMember, PlanMemberStatusEnum, Message, Event
 from ..schemas import (
-    PlanOut, CreatePlanBody, VoteBody, MsgBody, PlanStatusBody,
+    PlanOut, CreatePlanBody, VoteBody, MsgBody, PlanStatusBody, InviteBody,
     MessageOut, UserOut, EventOut
 )
 from ..auth import get_current_user, decode_token
@@ -148,6 +148,56 @@ async def get_plan(
     if current_user.id not in member_ids:
         raise HTTPException(status_code=403, detail="Not a member of this plan")
 
+    return await _load_plan_out(plan, db, current_user)
+
+
+@router.post("/{plan_id}/invite", response_model=PlanOut)
+async def invite_to_plan(
+    plan_id: str,
+    body: InviteBody,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Plan)
+        .options(
+            selectinload(Plan.members).selectinload(PlanMember.user),
+            selectinload(Plan.messages).selectinload(Message.sender),
+        )
+        .where(Plan.id == plan_id)
+    )
+    plan = result.scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    member_ids = {m.user_id for m in plan.members}
+    if current_user.id not in member_ids:
+        raise HTTPException(status_code=403, detail="Not a member of this plan")
+
+    added_count = 0
+    for uid in body.user_ids:
+        if uid not in member_ids:
+            db.add(PlanMember(plan_id=plan.id, user_id=uid, status=PlanMemberStatusEnum.invited))
+            member_ids.add(uid)
+            added_count += 1
+
+    if added_count:
+        db.add(Message(
+            plan_id=plan.id, user_id=current_user.id,
+            body=f"{current_user.name} invited {added_count} person{'s' if added_count > 1 else ''}",
+            type="system"
+        ))
+        await db.commit()
+
+    result = await db.execute(
+        select(Plan)
+        .options(
+            selectinload(Plan.members).selectinload(PlanMember.user),
+            selectinload(Plan.messages).selectinload(Message.sender),
+        )
+        .where(Plan.id == plan_id)
+    )
+    plan = result.scalar_one()
     return await _load_plan_out(plan, db, current_user)
 
 

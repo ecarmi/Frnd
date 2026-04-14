@@ -16,7 +16,7 @@ from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..models import User, Event, RSVP, SavedEvent, Friendship, RSVPStatusEnum
+from ..models import User, Event, Venue, RSVP, SavedEvent, Friendship, RSVPStatusEnum
 from ..schemas import EventOut, UserOut
 
 
@@ -128,18 +128,8 @@ async def get_feed(
         .join(Event.venue)
         .where(
             Event.start_time >= now,
-            Event.venue_id.in_(
-                select(Event.venue_id)
-                .join(Event.venue)
-                .where(
-                    Event.venue.has(
-                        lambda v: (
-                            v.latitude.between(lat - lat_delta, lat + lat_delta) &
-                            v.longitude.between(lng - lng_delta, lng + lng_delta)
-                        )
-                    )
-                )
-            )
+            Venue.latitude.between(lat - lat_delta, lat + lat_delta),
+            Venue.longitude.between(lng - lng_delta, lng + lng_delta),
         )
         .limit(200)
     )

@@ -34,7 +34,9 @@ class TasteProfileOut(OrmBase):
 
 class UserOut(OrmBase):
     id: str
+    email: Optional[str] = None
     phone: Optional[str] = None
+    university: Optional[str] = None
     name: str
     avatar_url: Optional[str] = None
     latitude: Optional[float] = None
@@ -54,11 +56,13 @@ class UserUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 
 class OTPRequest(BaseModel):
-    phone: str
+    phone: Optional[str] = None  # kept for backward compat
+    email: Optional[str] = None
 
 
 class OTPVerify(BaseModel):
-    phone: str
+    phone: Optional[str] = None  # kept for backward compat
+    email: Optional[str] = None
     code: str
 
 
@@ -219,6 +223,10 @@ class MsgBody(BaseModel):
 
 class PlanStatusBody(BaseModel):
     status: PlanStatusEnum
+
+
+class InviteBody(BaseModel):
+    user_ids: list[str]
 
 
 # ---------------------------------------------------------------------------
