@@ -4,10 +4,10 @@
   "stack": {
     "ios": "SwiftUI (iOS 17+)",
     "backend": "FastAPI + SQLAlchemy + PostgreSQL + Redis",
-    "infrastructure": "Docker Compose (local), undeployed (cloud)"
+    "infrastructure": "Docker Compose (local), Railway (deployment in progress)"
   },
-  "last_updated": "2026-04-13",
-  "notes": "Auth migrated from phone/SMS to email-based OTP. Carpooling demoted to future idea.",
+  "last_updated": "2026-04-14",
+  "notes": "Auth migrated from phone/SMS to email-based OTP. Carpooling demoted to future idea. Railway deployment in progress.",
 
   "areas": {
 
@@ -36,7 +36,7 @@
     "ios_screens": {
       "label": "iOS — Screens",
       "items": [
-        { "id": "ios-s1",  "status": "done",        "title": "Onboarding — email → OTP → name → vibes", "notes": "Migrated from phone to email OTP. Dev bypass: any email + code 000000." },
+        { "id": "ios-s1",  "status": "done",        "title": "Onboarding — email → OTP → name → vibes", "notes": "Email OTP auth. Dev bypass: ecarmi@uchicago.edu + 000000. Vibe tags consolidated to 15, no scroll, min 3 selections." },
         { "id": "ios-s2",  "status": "done",        "title": "Feed — scrollable cards, RSVP, save, AI reason chip, time filters, infinite scroll" },
         { "id": "ios-s3",  "status": "done",        "title": "Event Detail — map, RSVP, friend avatars, price" },
         { "id": "ios-s4",  "status": "done",        "title": "Map tab — event pins, user location" },
@@ -115,13 +115,13 @@
     "devops_deployment": {
       "label": "DevOps & Deployment",
       "items": [
-        { "id": "ops-1", "status": "not_started", "title": "Cloud deployment (API)", "notes": "Candidates: Railway, Render, Fly.io, AWS ECS" },
-        { "id": "ops-2", "status": "not_started", "title": "Managed PostgreSQL", "notes": "Candidates: Supabase, Neon, RDS, Railway" },
-        { "id": "ops-3", "status": "not_started", "title": "Managed Redis", "notes": "Candidates: Upstash, Redis Cloud, Railway" },
-        { "id": "ops-4", "status": "not_started", "title": "Environment secrets management", "notes": "SECRET_KEY, Twilio creds, etc. currently hardcoded or in docker-compose.yml" },
-        { "id": "ops-5", "status": "not_started", "title": "CI/CD pipeline", "notes": "No GitHub Actions. No automated build/test on push." },
+        { "id": "ops-1", "status": "in_progress",  "title": "Cloud deployment (API)", "notes": "Railway selected. Dockerfile + railway.toml configured. Blocked on Postgres provisioning issue." },
+        { "id": "ops-2", "status": "in_progress",  "title": "Managed PostgreSQL", "notes": "Railway Postgres. Volume cleanup needed before service can be recreated." },
+        { "id": "ops-3", "status": "not_started", "title": "Managed Redis", "notes": "Railway Redis — not yet added, pending Postgres fix." },
+        { "id": "ops-4", "status": "done",        "title": "Environment secrets management", "notes": "SECRET_KEY, DATABASE_URL, REDIS_URL set as Railway environment variables." },
+        { "id": "ops-5", "status": "done",        "title": "CI/CD pipeline", "notes": "Railway auto-deploys on every git push to main." },
         { "id": "ops-6", "status": "not_started", "title": "Logging / observability", "notes": "No structured logging, no error tracking (Sentry), no metrics." },
-        { "id": "ops-7", "status": "not_started", "title": "iOS staging vs production environments", "notes": "APIService.swift has one hardcoded baseURL pointing to localhost." }
+        { "id": "ops-7", "status": "incomplete",  "title": "iOS staging vs production environments", "notes": "APIService baseURL updated to Railway URL. No separate staging env yet." }
       ]
     },
 

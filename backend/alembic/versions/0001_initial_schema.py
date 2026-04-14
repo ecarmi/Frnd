@@ -16,19 +16,29 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _create_enum(name: str, values: list) -> None:
+    vals = ", ".join(f"'{v}'" for v in values)
+    op.execute(f"""
+        DO $$ BEGIN
+            CREATE TYPE {name} AS ENUM ({vals});
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
+
+
 def upgrade() -> None:
-    # --- Enums (raw SQL so IF NOT EXISTS is truly idempotent) ---
-    op.execute("CREATE TYPE IF NOT EXISTS eventcategoryenum AS ENUM ('music', 'nightlife', 'food_drink', 'arts', 'sports', 'other')")
-    op.execute("CREATE TYPE IF NOT EXISTS eventtypeenum AS ENUM ('study', 'social', 'sports', 'food', 'career', 'entertainment', 'creative', 'wellness', 'other')")
-    op.execute("CREATE TYPE IF NOT EXISTS rsvpstatusenum AS ENUM ('going', 'interested', 'not_going')")
-    op.execute("CREATE TYPE IF NOT EXISTS friendshiptierenum AS ENUM ('inner_circle', 'friend', 'connection')")
-    op.execute("CREATE TYPE IF NOT EXISTS planstatusenum AS ENUM ('proposal', 'voting', 'locked', 'live', 'archived')")
-    op.execute("CREATE TYPE IF NOT EXISTS planmemberstatusenum AS ENUM ('invited', 'going', 'maybe', 'declined')")
-    op.execute("CREATE TYPE IF NOT EXISTS messagetypeenum AS ENUM ('text', 'image', 'system')")
-    op.execute("CREATE TYPE IF NOT EXISTS grouproleenum AS ENUM ('owner', 'admin', 'member')")
-    op.execute("CREATE TYPE IF NOT EXISTS activitytypeenum AS ENUM ('study', 'sports', 'food', 'social', 'creative', 'wellness', 'other')")
-    op.execute("CREATE TYPE IF NOT EXISTS activitystatusenum AS ENUM ('open', 'full', 'cancelled', 'completed')")
-    op.execute("CREATE TYPE IF NOT EXISTS carpoolstatusenum AS ENUM ('open', 'full', 'cancelled')")
+    # --- Enums (DO block catches duplicate_object on any Postgres version) ---
+    _create_enum("eventcategoryenum", ["music", "nightlife", "food_drink", "arts", "sports", "other"])
+    _create_enum("eventtypeenum", ["study", "social", "sports", "food", "career", "entertainment", "creative", "wellness", "other"])
+    _create_enum("rsvpstatusenum", ["going", "interested", "not_going"])
+    _create_enum("friendshiptierenum", ["inner_circle", "friend", "connection"])
+    _create_enum("planstatusenum", ["proposal", "voting", "locked", "live", "archived"])
+    _create_enum("planmemberstatusenum", ["invited", "going", "maybe", "declined"])
+    _create_enum("messagetypeenum", ["text", "image", "system"])
+    _create_enum("grouproleenum", ["owner", "admin", "member"])
+    _create_enum("activitytypeenum", ["study", "sports", "food", "social", "creative", "wellness", "other"])
+    _create_enum("activitystatusenum", ["open", "full", "cancelled", "completed"])
+    _create_enum("carpoolstatusenum", ["open", "full", "cancelled"])
 
     # --- Tables ---
     op.create_table(
