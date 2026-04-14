@@ -76,8 +76,10 @@ async def complete_onboarding(
     current_user.onboarding_complete = True
 
     await db.commit()
-    await db.refresh(current_user)
-    return current_user
+    result = await db.execute(
+        select(User).where(User.id == current_user.id).options(selectinload(User.taste_profile))
+    )
+    return result.scalar_one()
 
 
 @router.get("/me/friends", response_model=list[FriendshipOut])
