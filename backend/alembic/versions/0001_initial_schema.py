@@ -9,7 +9,6 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 revision: str = "0001"
 down_revision: Union[str, None] = None
@@ -18,30 +17,18 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # --- Enums ---
-    event_category = postgresql.ENUM(
-        "music", "nightlife", "food_drink", "arts", "sports", "other",
-        name="eventcategoryenum", create_type=True
-    )
-    event_type_enum = postgresql.ENUM(
-        "study", "social", "sports", "food", "career", "entertainment", "creative", "wellness", "other",
-        name="eventtypeenum", create_type=True
-    )
-    rsvp_status = postgresql.ENUM("going", "interested", "not_going", name="rsvpstatusenum", create_type=True)
-    friendship_tier = postgresql.ENUM("inner_circle", "friend", "connection", name="friendshiptierenum", create_type=True)
-    plan_status = postgresql.ENUM("proposal", "voting", "locked", "live", "archived", name="planstatusenum", create_type=True)
-    plan_member_status = postgresql.ENUM("invited", "going", "maybe", "declined", name="planmemberstatusenum", create_type=True)
-    message_type = postgresql.ENUM("text", "image", "system", name="messagetypeenum", create_type=True)
-    group_role = postgresql.ENUM("owner", "admin", "member", name="grouproleenum", create_type=True)
-    activity_type = postgresql.ENUM("study", "sports", "food", "social", "creative", "wellness", "other", name="activitytypeenum", create_type=True)
-    activity_status = postgresql.ENUM("open", "full", "cancelled", "completed", name="activitystatusenum", create_type=True)
-    carpool_status = postgresql.ENUM("open", "full", "cancelled", name="carpoolstatusenum", create_type=True)
-
-    for e in [
-        event_category, event_type_enum, rsvp_status, friendship_tier, plan_status,
-        plan_member_status, message_type, group_role, activity_type, activity_status, carpool_status
-    ]:
-        e.create(op.get_bind(), checkfirst=True)
+    # --- Enums (raw SQL so IF NOT EXISTS is truly idempotent) ---
+    op.execute("CREATE TYPE IF NOT EXISTS eventcategoryenum AS ENUM ('music', 'nightlife', 'food_drink', 'arts', 'sports', 'other')")
+    op.execute("CREATE TYPE IF NOT EXISTS eventtypeenum AS ENUM ('study', 'social', 'sports', 'food', 'career', 'entertainment', 'creative', 'wellness', 'other')")
+    op.execute("CREATE TYPE IF NOT EXISTS rsvpstatusenum AS ENUM ('going', 'interested', 'not_going')")
+    op.execute("CREATE TYPE IF NOT EXISTS friendshiptierenum AS ENUM ('inner_circle', 'friend', 'connection')")
+    op.execute("CREATE TYPE IF NOT EXISTS planstatusenum AS ENUM ('proposal', 'voting', 'locked', 'live', 'archived')")
+    op.execute("CREATE TYPE IF NOT EXISTS planmemberstatusenum AS ENUM ('invited', 'going', 'maybe', 'declined')")
+    op.execute("CREATE TYPE IF NOT EXISTS messagetypeenum AS ENUM ('text', 'image', 'system')")
+    op.execute("CREATE TYPE IF NOT EXISTS grouproleenum AS ENUM ('owner', 'admin', 'member')")
+    op.execute("CREATE TYPE IF NOT EXISTS activitytypeenum AS ENUM ('study', 'sports', 'food', 'social', 'creative', 'wellness', 'other')")
+    op.execute("CREATE TYPE IF NOT EXISTS activitystatusenum AS ENUM ('open', 'full', 'cancelled', 'completed')")
+    op.execute("CREATE TYPE IF NOT EXISTS carpoolstatusenum AS ENUM ('open', 'full', 'cancelled')")
 
     # --- Tables ---
     op.create_table(
@@ -89,7 +76,7 @@ def upgrade() -> None:
         sa.Column("id", sa.String(), primary_key=True),
         sa.Column("group_id", sa.String(), sa.ForeignKey("groups.id"), nullable=False),
         sa.Column("user_id", sa.String(), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("role", sa.Enum("owner", "admin", "member", name="grouproleenum", create_type=False), nullable=False, server_default="member"),
+        sa.Column("role", sa.Text(), nullable=False, server_default="member"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
 
@@ -118,8 +105,8 @@ def upgrade() -> None:
         sa.Column("price_min", sa.Float(), nullable=True),
         sa.Column("price_max", sa.Float(), nullable=True),
         sa.Column("capacity", sa.Integer(), nullable=True),
-        sa.Column("category", sa.Enum("music", "nightlife", "food_drink", "arts", "sports", "other", name="eventcategoryenum", create_type=False), nullable=False, server_default="other"),
-        sa.Column("event_type", sa.Enum("study", "social", "sports", "food", "career", "entertainment", "creative", "wellness", "other", name="eventtypeenum", create_type=False), nullable=True),
+        sa.Column("category", sa.Text(), nullable=False, server_default="other"),
+        sa.Column("event_type", sa.Text(), nullable=True),
         sa.Column("group_id", sa.String(), sa.ForeignKey("groups.id"), nullable=True),
         sa.Column("tags", sa.JSON(), nullable=False, server_default="[]"),
         sa.Column("image_url", sa.String(500), nullable=True),
@@ -134,7 +121,7 @@ def upgrade() -> None:
         sa.Column("id", sa.String(), primary_key=True),
         sa.Column("user_id", sa.String(), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("event_id", sa.String(), sa.ForeignKey("events.id"), nullable=False),
-        sa.Column("status", sa.Enum("going", "interested", "not_going", name="rsvpstatusenum", create_type=False), nullable=False),
+        sa.Column("status", sa.Text(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
 
@@ -143,7 +130,7 @@ def upgrade() -> None:
         sa.Column("id", sa.String(), primary_key=True),
         sa.Column("user_a_id", sa.String(), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("user_b_id", sa.String(), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("tier", sa.Enum("inner_circle", "friend", "connection", name="friendshiptierenum", create_type=False), nullable=False, server_default="friend"),
+        sa.Column("tier", sa.Text(), nullable=False, server_default="friend"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
 
@@ -154,7 +141,7 @@ def upgrade() -> None:
         sa.Column("title", sa.String(200), nullable=False),
         sa.Column("event_ids", sa.JSON(), nullable=False, server_default="[]"),
         sa.Column("selected_event_id", sa.String(), sa.ForeignKey("events.id"), nullable=True),
-        sa.Column("status", sa.Enum("proposal", "voting", "locked", "live", "archived", name="planstatusenum", create_type=False), nullable=False, server_default="proposal"),
+        sa.Column("status", sa.Text(), nullable=False, server_default="proposal"),
         sa.Column("meeting_time", sa.DateTime(timezone=True), nullable=True),
         sa.Column("meeting_location", sa.String(500), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -165,7 +152,7 @@ def upgrade() -> None:
         sa.Column("id", sa.String(), primary_key=True),
         sa.Column("plan_id", sa.String(), sa.ForeignKey("plans.id"), nullable=False),
         sa.Column("user_id", sa.String(), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("status", sa.Enum("invited", "going", "maybe", "declined", name="planmemberstatusenum", create_type=False), nullable=False, server_default="invited"),
+        sa.Column("status", sa.Text(), nullable=False, server_default="invited"),
     )
 
     op.create_table(
@@ -174,7 +161,7 @@ def upgrade() -> None:
         sa.Column("plan_id", sa.String(), sa.ForeignKey("plans.id"), nullable=False),
         sa.Column("user_id", sa.String(), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("body", sa.Text(), nullable=False),
-        sa.Column("type", sa.Enum("text", "image", "system", name="messagetypeenum", create_type=False), nullable=False, server_default="text"),
+        sa.Column("type", sa.Text(), nullable=False, server_default="text"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
 
@@ -211,14 +198,14 @@ def upgrade() -> None:
         sa.Column("creator_id", sa.String(), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("title", sa.String(300), nullable=False),
         sa.Column("description", sa.Text(), nullable=False, server_default=""),
-        sa.Column("activity_type", sa.Enum("study", "sports", "food", "social", "creative", "wellness", "other", name="activitytypeenum", create_type=False), nullable=False, server_default="social"),
+        sa.Column("activity_type", sa.Text(), nullable=False, server_default="social"),
         sa.Column("location", sa.String(500), nullable=True),
         sa.Column("latitude", sa.Float(), nullable=True),
         sa.Column("longitude", sa.Float(), nullable=True),
         sa.Column("scheduled_time", sa.DateTime(timezone=True), nullable=True),
         sa.Column("max_participants", sa.Integer(), nullable=True),
         sa.Column("group_id", sa.String(), sa.ForeignKey("groups.id"), nullable=True),
-        sa.Column("status", sa.Enum("open", "full", "cancelled", "completed", name="activitystatusenum", create_type=False), nullable=False, server_default="open"),
+        sa.Column("status", sa.Text(), nullable=False, server_default="open"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
 
@@ -241,7 +228,7 @@ def upgrade() -> None:
         sa.Column("departure_time", sa.DateTime(timezone=True), nullable=True),
         sa.Column("total_seats", sa.Integer(), nullable=False, server_default="3"),
         sa.Column("notes", sa.Text(), nullable=True),
-        sa.Column("status", sa.Enum("open", "full", "cancelled", name="carpoolstatusenum", create_type=False), nullable=False, server_default="open"),
+        sa.Column("status", sa.Text(), nullable=False, server_default="open"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
 
