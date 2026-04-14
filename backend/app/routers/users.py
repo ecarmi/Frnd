@@ -34,8 +34,10 @@ async def update_me(
     if body.name is not None:
         current_user.name = body.name
     await db.commit()
-    await db.refresh(current_user)
-    return current_user
+    result = await db.execute(
+        select(User).where(User.id == current_user.id).options(selectinload(User.taste_profile))
+    )
+    return result.scalar_one()
 
 
 @router.post("/me/onboarding", response_model=UserOut)
