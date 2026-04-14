@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from sqlalchemy import (
     String, Float, Integer, Boolean, DateTime, ForeignKey,
-    Enum as SAEnum, JSON, Text, func
+    JSON, Text, func
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -175,8 +175,8 @@ class Event(Base):
     price_min: Mapped[Optional[float]]   = mapped_column(Float)
     price_max: Mapped[Optional[float]]   = mapped_column(Float)
     capacity: Mapped[Optional[int]]      = mapped_column(Integer)
-    category: Mapped[EventCategoryEnum]  = mapped_column(SAEnum(EventCategoryEnum), default=EventCategoryEnum.other)
-    event_type: Mapped[Optional[EventTypeEnum]] = mapped_column(SAEnum(EventTypeEnum), nullable=True)
+    category: Mapped[EventCategoryEnum]  = mapped_column(String, default=EventCategoryEnum.other)
+    event_type: Mapped[Optional[EventTypeEnum]] = mapped_column(String, nullable=True)
     group_id: Mapped[Optional[str]] = mapped_column(ForeignKey("groups.id"), nullable=True)
     tags: Mapped[list]      = mapped_column(JSON, default=list)
     image_url: Mapped[Optional[str]] = mapped_column(String(500))
@@ -196,7 +196,7 @@ class RSVP(Base):
     id: Mapped[str]         = mapped_column(String, primary_key=True, default=new_uuid)
     user_id: Mapped[str]    = mapped_column(ForeignKey("users.id"), nullable=False)
     event_id: Mapped[str]   = mapped_column(ForeignKey("events.id"), nullable=False)
-    status: Mapped[RSVPStatusEnum] = mapped_column(SAEnum(RSVPStatusEnum))
+    status: Mapped[RSVPStatusEnum] = mapped_column(String)
     created_at: Mapped[datetime]   = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user:  Mapped["User"]  = relationship(back_populates="rsvps")
@@ -209,7 +209,7 @@ class Friendship(Base):
     id: Mapped[str]       = mapped_column(String, primary_key=True, default=new_uuid)
     user_a_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
     user_b_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
-    tier: Mapped[FriendshipTierEnum] = mapped_column(SAEnum(FriendshipTierEnum), default=FriendshipTierEnum.friend)
+    tier: Mapped[FriendshipTierEnum] = mapped_column(String, default=FriendshipTierEnum.friend)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -221,7 +221,7 @@ class Plan(Base):
     title: Mapped[str]        = mapped_column(String(200), nullable=False)
     event_ids: Mapped[list]   = mapped_column(JSON, default=list)
     selected_event_id: Mapped[Optional[str]] = mapped_column(ForeignKey("events.id"))
-    status: Mapped[PlanStatusEnum] = mapped_column(SAEnum(PlanStatusEnum), default=PlanStatusEnum.proposal)
+    status: Mapped[PlanStatusEnum] = mapped_column(String, default=PlanStatusEnum.proposal)
     meeting_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     meeting_location: Mapped[Optional[str]]  = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -237,9 +237,7 @@ class PlanMember(Base):
     id: Mapped[str]       = mapped_column(String, primary_key=True, default=new_uuid)
     plan_id: Mapped[str]  = mapped_column(ForeignKey("plans.id"), nullable=False)
     user_id: Mapped[str]  = mapped_column(ForeignKey("users.id"), nullable=False)
-    status: Mapped[PlanMemberStatusEnum] = mapped_column(
-        SAEnum(PlanMemberStatusEnum), default=PlanMemberStatusEnum.invited
-    )
+    status: Mapped[PlanMemberStatusEnum] = mapped_column(String, default=PlanMemberStatusEnum.invited)
 
     plan: Mapped["Plan"] = relationship(back_populates="members")
     user: Mapped["User"] = relationship()
@@ -252,7 +250,7 @@ class Message(Base):
     plan_id: Mapped[str]  = mapped_column(ForeignKey("plans.id"), nullable=False)
     user_id: Mapped[str]  = mapped_column(ForeignKey("users.id"), nullable=False)
     body: Mapped[str]     = mapped_column(Text, nullable=False)
-    type: Mapped[MessageTypeEnum] = mapped_column(SAEnum(MessageTypeEnum), default=MessageTypeEnum.text)
+    type: Mapped[MessageTypeEnum] = mapped_column(String, default=MessageTypeEnum.text)
     created_at: Mapped[datetime]  = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     plan:   Mapped["Plan"] = relationship(back_populates="messages")
@@ -315,7 +313,7 @@ class GroupMembership(Base):
     id: Mapped[str]       = mapped_column(String, primary_key=True, default=new_uuid)
     group_id: Mapped[str] = mapped_column(ForeignKey("groups.id"), nullable=False)
     user_id: Mapped[str]  = mapped_column(ForeignKey("users.id"), nullable=False)
-    role: Mapped[GroupRoleEnum] = mapped_column(SAEnum(GroupRoleEnum), default=GroupRoleEnum.member)
+    role: Mapped[GroupRoleEnum] = mapped_column(String, default=GroupRoleEnum.member)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     group: Mapped["Group"] = relationship(back_populates="members")
@@ -333,16 +331,14 @@ class ActivityPost(Base):
     creator_id: Mapped[str]   = mapped_column(ForeignKey("users.id"), nullable=False)
     title: Mapped[str]        = mapped_column(String(300), nullable=False)
     description: Mapped[str]  = mapped_column(Text, default="")
-    activity_type: Mapped[ActivityTypeEnum] = mapped_column(SAEnum(ActivityTypeEnum),
-                                                              default=ActivityTypeEnum.social)
+    activity_type: Mapped[ActivityTypeEnum] = mapped_column(String, default=ActivityTypeEnum.social)
     location: Mapped[Optional[str]]         = mapped_column(String(500))
     latitude: Mapped[Optional[float]]       = mapped_column(Float)
     longitude: Mapped[Optional[float]]      = mapped_column(Float)
     scheduled_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     max_participants: Mapped[Optional[int]] = mapped_column(Integer)
     group_id: Mapped[Optional[str]]         = mapped_column(ForeignKey("groups.id"), nullable=True)
-    status: Mapped[ActivityStatusEnum]      = mapped_column(SAEnum(ActivityStatusEnum),
-                                                             default=ActivityStatusEnum.open)
+    status: Mapped[ActivityStatusEnum]      = mapped_column(String, default=ActivityStatusEnum.open)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     creator: Mapped["User"] = relationship()
@@ -378,8 +374,7 @@ class Carpool(Base):
     departure_time: Mapped[Optional[datetime]]   = mapped_column(DateTime(timezone=True))
     total_seats: Mapped[int]     = mapped_column(Integer, default=3)
     notes: Mapped[Optional[str]] = mapped_column(Text)
-    status: Mapped[CarpoolStatusEnum] = mapped_column(SAEnum(CarpoolStatusEnum),
-                                                       default=CarpoolStatusEnum.open)
+    status: Mapped[CarpoolStatusEnum] = mapped_column(String, default=CarpoolStatusEnum.open)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     driver: Mapped["User"] = relationship()
