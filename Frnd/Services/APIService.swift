@@ -273,6 +273,10 @@ final class APIService: ObservableObject {
         try await request(path: "/users/me/events")
     }
 
+    func joinPlanByCode(_ code: String) async throws -> Plan {
+        try await request(path: "/plans/join/\(code)", method: "POST")
+    }
+
     // MARK: - Create / Delete Events
 
     struct CreateEventBody: Encodable {

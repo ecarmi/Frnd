@@ -215,6 +215,7 @@ class PlanOut(OrmBase):
     messages: list[MessageOut] = []
     created_at: datetime
     selected_event_id: Optional[str] = None
+    invite_code: Optional[str] = None
 
 
 class CreatePlanBody(BaseModel):

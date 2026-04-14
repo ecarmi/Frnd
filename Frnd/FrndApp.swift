@@ -9,6 +9,9 @@ struct FrndApp: App {
             RootView()
                 .environmentObject(appState)
                 .preferredColorScheme(.dark)
+                .onOpenURL { url in
+                    appState.handleDeepLink(url)
+                }
         }
     }
 }

@@ -39,6 +39,7 @@ async def _load_plan_out(plan: Plan, db: AsyncSession, current_user: User) -> Pl
         status=plan.status,
         meeting_time=plan.meeting_time,
         meeting_location=plan.meeting_location,
+        invite_code=plan.invite_code,
         members=[
             _member_out(m) for m in plan.members
         ],
@@ -303,6 +304,48 @@ async def update_status(
 
     plan.status = body.status
     await db.commit()
+    return await _load_plan_out(plan, db, current_user)
+
+
+@router.post("/join/{invite_code}", response_model=PlanOut)
+async def join_plan_by_code(
+    invite_code: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Plan)
+        .options(
+            selectinload(Plan.members).selectinload(PlanMember.user).selectinload(User.taste_profile),
+            selectinload(Plan.messages).selectinload(Message.sender),
+        )
+        .where(Plan.invite_code == invite_code)
+    )
+    plan = result.scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Invalid invite code")
+
+    member_ids = {m.user_id for m in plan.members}
+    if current_user.id in member_ids:
+        return await _load_plan_out(plan, db, current_user)
+
+    db.add(PlanMember(plan_id=plan.id, user_id=current_user.id, status=PlanMemberStatusEnum.invited))
+    db.add(Message(
+        plan_id=plan.id, user_id=current_user.id,
+        body=f"{current_user.name} joined via invite link",
+        type="system"
+    ))
+    await db.commit()
+
+    result = await db.execute(
+        select(Plan)
+        .options(
+            selectinload(Plan.members).selectinload(PlanMember.user).selectinload(User.taste_profile),
+            selectinload(Plan.messages).selectinload(Message.sender),
+        )
+        .where(Plan.id == plan.id)
+    )
+    plan = result.scalar_one()
     return await _load_plan_out(plan, db, current_user)
 
 

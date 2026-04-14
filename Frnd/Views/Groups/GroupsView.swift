@@ -274,20 +274,28 @@ struct GroupDetailView: View {
 
     private func inviteCodeSection(_ code: String) -> some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            Text("Invite Code")
+            Text("Invite Link")
                 .font(.mono)
                 .foregroundColor(.textTertiary)
                 .textCase(.uppercase)
                 .tracking(2)
             HStack {
-                Text(code)
-                    .font(.system(.title3, design: .monospaced))
-                    .foregroundColor(.teal)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("frnd://join/group/\(code)")
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(.teal)
+                        .lineLimit(1)
+                    Text("Share this link to invite anyone")
+                        .font(.captionSmall)
+                        .foregroundColor(.textTertiary)
+                }
                 Spacer()
-                Button {
-                    UIPasteboard.general.string = code
-                } label: {
-                    Image(systemName: "doc.on.doc")
+                ShareLink(
+                    item: URL(string: "frnd://join/group/\(code)")!,
+                    subject: Text("Join my group on Frnd"),
+                    message: Text("Tap to join \"\(group.name)\" on Frnd")
+                ) {
+                    Image(systemName: "square.and.arrow.up")
                         .foregroundColor(.teal)
                 }
             }

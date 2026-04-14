@@ -356,6 +356,7 @@ struct Plan: Codable, Identifiable {
     var messages: [Message]
     let createdAt: Date
     var selectedEventId: String?
+    let inviteCode: String?
 
     var pendingInvites: Int {
         members.filter { $0.status == .invited }.count
@@ -376,6 +377,7 @@ struct Plan: Codable, Identifiable {
         case members, messages
         case createdAt    = "created_at"
         case selectedEventId = "selected_event_id"
+        case inviteCode   = "invite_code"
     }
 }
 
@@ -770,7 +772,8 @@ extension Plan {
                            user: User(id: "u3", email: nil, phone: nil, university: nil, name: "Jordan Kim", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date())),
             ],
             messages: [],
-            createdAt: Date()
+            createdAt: Date(),
+            inviteCode: nil
         ),
     ]
 }

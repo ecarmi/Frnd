@@ -4,5 +4,16 @@
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Frnd uses your location to show nearby events.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.frnd.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>frnd</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

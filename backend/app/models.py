@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import ARRAY
 import enum
 import uuid
+import secrets
 
 from .database import Base
 
@@ -225,6 +226,7 @@ class Plan(Base):
     status: Mapped[PlanStatusEnum] = mapped_column(String, default=PlanStatusEnum.proposal)
     meeting_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     meeting_location: Mapped[Optional[str]]  = mapped_column(String(500))
+    invite_code: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True, default=lambda: secrets.token_urlsafe(8))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     members:  Mapped[list["PlanMember"]] = relationship(back_populates="plan", cascade="all, delete-orphan")

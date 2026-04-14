@@ -2,6 +2,9 @@ import SwiftUI
 
 struct MainTabView: View {
     @State private var selectedTab: Tab = .feed
+    @State private var joinedPlan: Plan?
+    @State private var joinedGroup: Group?
+    @State private var deepLinkError: String?
     @EnvironmentObject var appState: AppState
 
     enum Tab: Int, CaseIterable {
@@ -34,6 +37,47 @@ struct MainTabView: View {
         }
         .ignoresSafeArea(edges: .bottom)
         .appBackground()
+        .onChange(of: appState.pendingDeepLink) { link in
+            guard let link else { return }
+            Task {
+                await handleDeepLink(link)
+                appState.pendingDeepLink = nil
+            }
+        }
+        .sheet(item: $joinedPlan) { plan in
+            NavigationStack {
+                PlanDetailView(plan: plan)
+                    .environmentObject(appState)
+            }
+        }
+        .alert("Could not join", isPresented: Binding(
+            get: { deepLinkError != nil },
+            set: { if !$0 { deepLinkError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(deepLinkError ?? "")
+        }
+    }
+
+    private func handleDeepLink(_ link: DeepLink) async {
+        switch link {
+        case .joinGroup(let code):
+            do {
+                let group = try await APIService.shared.joinGroup(inviteCode: code)
+                joinedGroup = group
+                selectedTab = .search
+            } catch {
+                deepLinkError = "Could not join group: \(error.localizedDescription)"
+            }
+        case .joinPlan(let code):
+            do {
+                let plan = try await APIService.shared.joinPlanByCode(code)
+                joinedPlan = plan
+            } catch {
+                deepLinkError = "Could not join plan: \(error.localizedDescription)"
+            }
+        }
     }
 }
 

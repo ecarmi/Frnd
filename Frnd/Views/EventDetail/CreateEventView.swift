@@ -1,5 +1,5 @@
 import SwiftUI
-import CoreLocation
+import MapKit
 
 struct CreateEventView: View {
     let groupId: String?
@@ -178,20 +178,22 @@ struct CreateEventView: View {
         isSubmitting = true
         defer { isSubmitting = false }
 
-        // Geocode address
-        let geocoder = CLGeocoder()
-        let placemarks: [CLPlacemark]
+        // Geocode address using MKLocalSearch
+        let searchRequest = MKLocalSearch.Request()
+        searchRequest.naturalLanguageQuery = venueAddress
+        let searchResponse: MKLocalSearch.Response
         do {
-            placemarks = try await geocoder.geocodeAddressString(venueAddress)
+            searchResponse = try await MKLocalSearch(request: searchRequest).start()
         } catch {
             geocodeError = "Address not found. Try a more specific address."
             return
         }
 
-        guard let loc = placemarks.first?.location else {
+        guard let mapItem = searchResponse.mapItems.first else {
             geocodeError = "Could not determine coordinates for that address."
             return
         }
+        let coord = mapItem.location.coordinate
 
         let body = APIService.CreateEventBody(
             title: title.trimmingCharacters(in: .whitespaces),
@@ -199,8 +201,8 @@ struct CreateEventView: View {
             venue: .init(
                 name: venueName.trimmingCharacters(in: .whitespaces),
                 address: venueAddress.trimmingCharacters(in: .whitespaces),
-                latitude: loc.coordinate.latitude,
-                longitude: loc.coordinate.longitude
+                latitude: coord.latitude,
+                longitude: coord.longitude
             ),
             start_time: startDate,
             end_time: hasEndTime ? endDate : nil,

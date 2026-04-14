@@ -302,6 +302,7 @@ struct PlanDetailView: View {
         }
         .padding(.horizontal, Spacing.base)
         .padding(.vertical, Spacing.sm)
+        .padding(.bottom, 70) // clear custom tab bar
         .background(Color.bgSurface)
     }
 
@@ -560,32 +561,44 @@ struct InviteFriendsSheet: View {
             ZStack {
                 Color.bgPrimary.ignoresSafeArea()
 
-                if isLoading {
-                    ProgressView().tint(.ember)
-                } else if friends.isEmpty {
-                    VStack(spacing: Spacing.md) {
-                        Image(systemName: "person.2")
-                            .font(.system(size: 40))
-                            .foregroundColor(.textTertiary)
-                        Text("No friends yet")
-                            .font(.headingSmall)
-                            .foregroundColor(.textPrimary)
-                        Text("Friend discovery is coming soon.")
-                            .font(.bodyMedium)
-                            .foregroundColor(.textSecondary)
-                    }
-                } else if invitableFriends.isEmpty {
-                    VStack(spacing: Spacing.md) {
-                        Image(systemName: "checkmark.circle")
-                            .font(.system(size: 40))
-                            .foregroundColor(.teal)
-                        Text("Everyone's already in this plan!")
-                            .font(.bodyMedium)
-                            .foregroundColor(.textSecondary)
-                    }
-                } else {
-                    List {
+                List {
+                    // Share link section — always shown at top
+                    if let code = plan.inviteCode {
                         Section {
+                            ShareLink(
+                                item: URL(string: "frnd://join/plan/\(code)")!,
+                                subject: Text("Join my plan on Frnd"),
+                                message: Text("Tap to join \"\(plan.title)\"")
+                            ) {
+                                HStack(spacing: Spacing.md) {
+                                    Image(systemName: "link")
+                                        .foregroundColor(.ember)
+                                        .frame(width: 32)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Share Invite Link")
+                                            .font(.headingSmall)
+                                            .foregroundColor(.textPrimary)
+                                        Text("Anyone with the link can join")
+                                            .font(.captionSmall)
+                                            .foregroundColor(.textSecondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.captionSmall)
+                                        .foregroundColor(.textTertiary)
+                                }
+                            }
+                        }
+                        .listRowBackground(Color.bgRaised)
+                    }
+
+                    if isLoading {
+                        Section {
+                            HStack { Spacer(); ProgressView().tint(.ember); Spacer() }
+                        }
+                        .listRowBackground(Color.bgRaised)
+                    } else if !invitableFriends.isEmpty {
+                        Section("Also invite friends") {
                             ForEach(invitableFriends) { friendship in
                                 if let user = friendship.otherUser {
                                     Button {
@@ -611,18 +624,18 @@ struct InviteFriendsSheet: View {
                             }
                         }
                         .listRowBackground(Color.bgRaised)
-
-                        if let error = error {
-                            Section {
-                                Text(error).foregroundColor(.rose).font(.captionMedium)
-                            }
-                            .listRowBackground(Color.bgRaised)
-                        }
                     }
-                    .scrollContentBackground(.hidden)
+
+                    if let error = error {
+                        Section {
+                            Text(error).foregroundColor(.rose).font(.captionMedium)
+                        }
+                        .listRowBackground(Color.bgRaised)
+                    }
                 }
+                .scrollContentBackground(.hidden)
             }
-            .navigationTitle("Invite Friends")
+            .navigationTitle("Invite to Plan")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

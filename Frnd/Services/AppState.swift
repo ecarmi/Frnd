@@ -1,12 +1,18 @@
 import SwiftUI
 import Combine
 
+enum DeepLink: Equatable {
+    case joinGroup(code: String)
+    case joinPlan(code: String)
+}
+
 @MainActor
 final class AppState: ObservableObject {
     @Published var currentUser: User?
     @Published var isAuthenticated: Bool = false
     @Published var onboardingComplete: Bool = false
     @Published var isLoading: Bool = false
+    @Published var pendingDeepLink: DeepLink?
 
     static let shared = AppState()
 
@@ -45,5 +51,21 @@ final class AppState: ObservableObject {
             let user = try await APIService.shared.fetchMe()
             setUser(user)
         } catch {}
+    }
+
+    func handleDeepLink(_ url: URL) {
+        // frnd://join/group/<code>
+        // frnd://join/plan/<code>
+        guard url.scheme == "frnd",
+              url.host == "join" else { return }
+        let parts = url.pathComponents.filter { $0 != "/" }
+        guard parts.count == 2 else { return }
+        let type = parts[0]
+        let code = parts[1]
+        switch type {
+        case "group": pendingDeepLink = .joinGroup(code: code)
+        case "plan":  pendingDeepLink = .joinPlan(code: code)
+        default: break
+        }
     }
 }
