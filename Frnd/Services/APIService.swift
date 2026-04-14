@@ -58,7 +58,8 @@ final class APIService: ObservableObject {
     ) async throws -> T {
         guard let url = URL(string: baseURL + path) else { throw APIError.invalidURL }
 
-        var req = URLRequest(url: url, timeoutInterval: 30)
+        let isAuth = path.hasPrefix("/auth")
+        var req = URLRequest(url: url, timeoutInterval: isAuth ? 60 : 30)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
 

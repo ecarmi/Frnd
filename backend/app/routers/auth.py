@@ -10,7 +10,7 @@ from ..models import User, OTPCode, TasteProfile
 from ..schemas import OTPRequest, OTPVerify, AuthResponse
 from ..auth import (
     generate_otp, send_email_otp, send_otp,
-    create_access_token, university_from_email, is_edu_email,
+    create_access_token, university_from_email, is_allowed_email,
     DEV_BYPASS_EMAIL,
 )
 from ..config import settings
@@ -28,8 +28,8 @@ async def request_email_otp(body: OTPRequest, db: AsyncSession = Depends(get_db)
 
     if not email:
         raise HTTPException(status_code=400, detail="Email is required")
-    if not is_edu_email(email):
-        raise HTTPException(status_code=400, detail="Please use a .edu email address")
+    if not is_allowed_email(email):
+        raise HTTPException(status_code=400, detail="Frnd is currently available at UChicago. More universities coming soon!")
 
     # Dev bypass — don't send an email, just return success
     if email == DEV_BYPASS_EMAIL:

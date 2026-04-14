@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 10080  # 7 days
 
     resend_api_key: str = ""
+    resend_from_email: str = "Frnd <onboarding@resend.dev>"
 
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""

@@ -199,17 +199,21 @@ private struct EmailStep: View {
     @Binding var error: String?
     let onContinue: () -> Void
 
-    private var isValidEdu: Bool {
-        email.lowercased().hasSuffix(".edu") && email.contains("@")
+    // Add your school's domain here when expanding to new universities
+    private let allowedDomains = ["uchicago.edu"]
+
+    private var isValidEmail: Bool {
+        let lower = email.lowercased()
+        return lower.contains("@") && allowedDomains.contains(where: { lower.hasSuffix($0) })
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 32) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Use your .edu email")
+                Text("UChicago students")
                     .font(.displayMedium)
                     .foregroundColor(.textPrimary)
-                Text("Frnd is for university students. Sign in with your school email to join your campus community.")
+                Text("Frnd is launching at UChicago first. Sign in with your uchicago.edu email to join your campus community.")
                     .font(.bodyLarge)
                     .foregroundColor(.textSecondary)
             }
@@ -218,7 +222,7 @@ private struct EmailStep: View {
                 TextField(
                     "",
                     text: $email,
-                    prompt: Text("you@university.edu").foregroundColor(.textTertiary)
+                    prompt: Text("you@uchicago.edu").foregroundColor(.textTertiary)
                 )
                 .font(.bodyLarge)
                 .foregroundColor(.textPrimary)
@@ -245,7 +249,7 @@ private struct EmailStep: View {
                 }
             }
             .buttonStyle(PrimaryButtonStyle())
-            .disabled(!isValidEdu || isLoading)
+            .disabled(!isValidEmail || isLoading)
         }
     }
 }

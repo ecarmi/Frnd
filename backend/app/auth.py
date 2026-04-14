@@ -96,9 +96,20 @@ def university_from_email(email: str) -> Optional[str]:
     return UNIVERSITY_DOMAINS.get(domain)
 
 
-def is_edu_email(email: str) -> bool:
+# ---------------------------------------------------------------------------
+# University whitelist
+# To open the app to a new school, add its domain here and a display name
+# in UNIVERSITY_DOMAINS above.
+# ---------------------------------------------------------------------------
+
+ALLOWED_DOMAINS: set[str] = {
+    "uchicago.edu",
+}
+
+
+def is_allowed_email(email: str) -> bool:
     domain = email.lower().split("@")[-1]
-    return domain.endswith(".edu")
+    return domain in ALLOWED_DOMAINS
 
 
 # ---------------------------------------------------------------------------
@@ -109,16 +120,11 @@ DEV_BYPASS_EMAIL = "ecarmi@uchicago.edu"
 
 
 async def send_email_otp(email: str, code: str) -> None:
-    """Send OTP via email. Prints to console in development."""
-    if settings.environment == "development":
-        print(f"[DEV] Email OTP for {email}: {code}")
-        return
-
+    """Send OTP via email. Prints to console when no API key is configured."""
     if not settings.resend_api_key:
         print(f"[WARN] No RESEND_API_KEY set — OTP for {email}: {code}")
         return
 
-    import httpx
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:auto">
       <h2 style="color:#FF6B35">Your Frnd verification code</h2>
@@ -134,7 +140,7 @@ async def send_email_otp(email: str, code: str) -> None:
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {settings.resend_api_key}"},
             json={
-                "from": "Frnd <noreply@frnd.app>",
+                "from": settings.resend_from_email,
                 "to": [email],
                 "subject": f"{code} is your Frnd code",
                 "html": html,
