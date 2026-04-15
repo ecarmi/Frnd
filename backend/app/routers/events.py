@@ -1,4 +1,10 @@
+import logging
+import traceback
+
 from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -88,30 +94,37 @@ async def create_event(
         await db.flush()
         venue_id = venue.id
 
-    event = Event(
-        title=body.title,
-        description=body.description,
-        venue_id=venue_id,
-        start_time=body.start_time,
-        end_time=body.end_time,
-        price_min=body.price_min,
-        price_max=body.price_max,
-        capacity=body.capacity,
-        category=body.category,
-        tags=body.tags,
-        image_url=body.image_url,
-        group_id=body.group_id,
-        source="user_created",
-        creator_id=current_user.id,
-    )
-    db.add(event)
-    await db.commit()
+    try:
+        event = Event(
+            title=body.title,
+            description=body.description,
+            venue_id=venue_id,
+            start_time=body.start_time,
+            end_time=body.end_time,
+            price_min=body.price_min,
+            price_max=body.price_max,
+            capacity=body.capacity,
+            category=body.category,
+            tags=body.tags,
+            image_url=body.image_url,
+            group_id=body.group_id,
+            source="user_created",
+            creator_id=current_user.id,
+        )
+        db.add(event)
+        await db.commit()
 
-    result = await db.execute(
-        select(Event).options(selectinload(Event.venue)).where(Event.id == event.id)
-    )
-    event = result.scalar_one()
-    return await build_feed_event_out(event, current_user, db)
+        result = await db.execute(
+            select(Event).options(selectinload(Event.venue)).where(Event.id == event.id)
+        )
+        event = result.scalar_one()
+        return await build_feed_event_out(event, current_user, db)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        tb = traceback.format_exc()
+        logger.error("create_event failed:\n%s", tb)
+        raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}")
 
 
 @router.delete("/{event_id}", status_code=204)
