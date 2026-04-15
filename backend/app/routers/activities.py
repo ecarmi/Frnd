@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -89,7 +91,9 @@ async def create_activity(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    post = ActivityPost(
+    post_id = str(uuid.uuid4())
+    db.add(ActivityPost(
+        id=post_id,
         creator_id=current_user.id,
         title=body.title,
         description=body.description,
@@ -101,15 +105,12 @@ async def create_activity(
         max_participants=body.max_participants,
         group_id=body.group_id,
         status=ActivityStatusEnum.open,
-    )
-    db.add(post)
-    await db.flush()
-
+    ))
     # Creator auto-joins
-    db.add(ActivityParticipant(activity_id=post.id, user_id=current_user.id))
+    db.add(ActivityParticipant(activity_id=post_id, user_id=current_user.id))
     await db.commit()
 
-    loaded = await _load_post(post.id, db)
+    loaded = await _load_post(post_id, db)
     return _post_out(loaded, current_user.id)
 
 

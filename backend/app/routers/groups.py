@@ -1,4 +1,5 @@
 import secrets
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -71,21 +72,20 @@ async def create_group(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    group_id = str(uuid.uuid4())
     invite_code = secrets.token_urlsafe(8) if body.is_private else None
-    group = Group(
+    db.add(Group(
+        id=group_id,
         name=body.name,
         description=body.description,
         creator_id=current_user.id,
         is_private=body.is_private,
         invite_code=invite_code,
-    )
-    db.add(group)
-    await db.flush()
-
-    db.add(GroupMembership(group_id=group.id, user_id=current_user.id, role=GroupRoleEnum.owner))
+    ))
+    db.add(GroupMembership(group_id=group_id, user_id=current_user.id, role=GroupRoleEnum.owner))
     await db.commit()
 
-    loaded = await _load_group(group.id, db)
+    loaded = await _load_group(group_id, db)
     return _group_out(loaded)
 
 

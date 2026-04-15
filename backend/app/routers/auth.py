@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -64,14 +65,10 @@ async def verify_email_otp(body: OTPVerify, db: AsyncSession = Depends(get_db)):
         user_result = await db.execute(select(User).where(User.email == email))
         user = user_result.scalar_one_or_none()
         if not user:
-            user = User(
-                email=email,
-                name="",
-                university=university_from_email(email),
-            )
+            user_id = str(uuid.uuid4())
+            user = User(id=user_id, email=email, name="", university=university_from_email(email))
             db.add(user)
-            await db.flush()
-            db.add(TasteProfile(user_id=user.id))
+            db.add(TasteProfile(user_id=user_id))
         await db.commit()
         user_result = await db.execute(
             select(User).where(User.email == email).options(selectinload(User.taste_profile))
@@ -100,14 +97,10 @@ async def verify_email_otp(body: OTPVerify, db: AsyncSession = Depends(get_db)):
     user = user_result.scalar_one_or_none()
 
     if not user:
-        user = User(
-            email=email,
-            name="",
-            university=university_from_email(email),
-        )
+        user_id = str(uuid.uuid4())
+        user = User(id=user_id, email=email, name="", university=university_from_email(email))
         db.add(user)
-        await db.flush()
-        db.add(TasteProfile(user_id=user.id))
+        db.add(TasteProfile(user_id=user_id))
 
     await db.commit()
     user_result = await db.execute(
@@ -153,10 +146,10 @@ async def verify_otp(body: OTPVerify, db: AsyncSession = Depends(get_db)):
         user_result = await db.execute(select(User).where(User.phone == phone))
         user = user_result.scalar_one_or_none()
         if not user:
-            user = User(phone=phone, name="")
+            user_id = str(uuid.uuid4())
+            user = User(id=user_id, phone=phone, name="")
             db.add(user)
-            await db.flush()
-            db.add(TasteProfile(user_id=user.id))
+            db.add(TasteProfile(user_id=user_id))
         await db.commit()
         await db.refresh(user)
         return AuthResponse(access_token=create_access_token(user.id), user=user)
@@ -181,10 +174,10 @@ async def verify_otp(body: OTPVerify, db: AsyncSession = Depends(get_db)):
     user = user_result.scalar_one_or_none()
 
     if not user:
-        user = User(phone=phone, name="")
+        user_id = str(uuid.uuid4())
+        user = User(id=user_id, phone=phone, name="")
         db.add(user)
-        await db.flush()
-        db.add(TasteProfile(user_id=user.id))
+        db.add(TasteProfile(user_id=user_id))
 
     await db.commit()
     await db.refresh(user)

@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -89,25 +91,25 @@ async def create_plan(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    plan = Plan(
+    plan_id = str(uuid.uuid4())
+    db.add(Plan(
+        id=plan_id,
         creator_id=current_user.id,
         title=body.title,
         event_ids=body.event_ids,
         status="voting" if len(body.event_ids) > 1 else "proposal",
-    )
-    db.add(plan)
-    await db.flush()
+    ))
 
     # Add creator as going
-    db.add(PlanMember(plan_id=plan.id, user_id=current_user.id, status=PlanMemberStatusEnum.going))
+    db.add(PlanMember(plan_id=plan_id, user_id=current_user.id, status=PlanMemberStatusEnum.going))
 
     # Add invitees
     for uid in body.invitee_ids:
-        db.add(PlanMember(plan_id=plan.id, user_id=uid, status=PlanMemberStatusEnum.invited))
+        db.add(PlanMember(plan_id=plan_id, user_id=uid, status=PlanMemberStatusEnum.invited))
 
     # System message
     db.add(Message(
-        plan_id=plan.id, user_id=current_user.id,
+        plan_id=plan_id, user_id=current_user.id,
         body=f"{current_user.name} created this plan",
         type="system"
     ))
@@ -120,7 +122,7 @@ async def create_plan(
             selectinload(Plan.members).selectinload(PlanMember.user).selectinload(User.taste_profile),
             selectinload(Plan.messages).selectinload(Message.sender),
         )
-        .where(Plan.id == plan.id)
+        .where(Plan.id == plan_id)
     )
     plan = result.scalar_one()
     return await _load_plan_out(plan, db, current_user)
