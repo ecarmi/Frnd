@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .database import engine, Base
+from .database import engine
 from .routers import auth, users, events, feed, plans, feedback, groups, activities, carpools
 
 logger = logging.getLogger(__name__)
@@ -14,9 +14,6 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create all tables on startup (use Alembic for production migrations)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
     yield
 
 
