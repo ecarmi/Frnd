@@ -114,7 +114,7 @@ class EventOut(OrmBase):
     image_url: Optional[str] = None
     source: str
     creator_id: Optional[str] = None
-    trending_score: float
+    trending_score: float = 0.0
     # Feed extras
     friends_going: list[UserOut] = []
     friends_interested: list[UserOut] = []

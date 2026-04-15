@@ -60,19 +60,11 @@ struct FeedView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: Spacing.md) {
-                        Button {
-                            showCreateEvent = true
-                        } label: {
-                            Image(systemName: "plus")
-                                .foregroundColor(.ember)
-                        }
-                        Button {
-                            Task { await viewModel.loadFeed(refresh: true) }
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .foregroundColor(.textSecondary)
-                        }
+                    Button {
+                        showCreateEvent = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .foregroundColor(.ember)
                     }
                 }
             }

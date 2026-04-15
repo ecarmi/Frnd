@@ -236,6 +236,11 @@ struct CreateActivityView: View {
     @State private var maxParticipants = ""
     @State private var isLoading = false
     @State private var error: String?
+    @State private var groups: [Group] = []
+    @State private var selectedGroupId: String? = nil
+
+    // Resolved group: use injected groupId if provided, otherwise use picker selection
+    private var resolvedGroupId: String? { groupId ?? selectedGroupId }
 
     var body: some View {
         NavigationStack {
@@ -276,11 +281,25 @@ struct CreateActivityView: View {
                             .foregroundColor(.textPrimary)
                     }
 
+                    // Group picker — only shown when not launched from within a group
+                    if groupId == nil && !groups.isEmpty {
+                        Section("Link to Group (optional)") {
+                            Picker("Group", selection: $selectedGroupId) {
+                                Text("None").tag(String?.none)
+                                ForEach(groups) { group in
+                                    Text(group.name).tag(Optional(group.id))
+                                }
+                            }
+                            .foregroundColor(.textPrimary)
+                        }
+                    }
+
                     if let error = error {
                         Section { Text(error).foregroundColor(.rose) }
                     }
                 }
                 .scrollContentBackground(.hidden)
+                .task { groups = (try? await APIService.shared.fetchMyGroups()) ?? [] }
             }
             .navigationTitle("New Activity")
             .navigationBarTitleDisplayMode(.inline)
@@ -307,7 +326,7 @@ struct CreateActivityView: View {
                                     longitude: nil,
                                     scheduledTime: hasTime ? scheduledTime : nil,
                                     maxParticipants: maxP,
-                                    groupId: groupId
+                                    groupId: resolvedGroupId
                                 )
                                 onCreated(post)
                                 dismiss()

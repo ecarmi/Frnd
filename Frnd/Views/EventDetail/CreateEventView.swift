@@ -20,12 +20,13 @@ struct CreateEventView: View {
     @State private var venueName = ""
     @State private var venueAddress = ""
     @State private var hasCapacity = false
-    @State private var capacity = 50
+    @State private var capacityText = "50"
 
     // State
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     @State private var geocodeError: String?
+    @State private var priceError: String?
 
     var body: some View {
         NavigationStack {
@@ -77,6 +78,7 @@ struct CreateEventView: View {
                     Text("Description (optional)")
                         .foregroundColor(.textTertiary)
                         .padding(.top, 8)
+                        .padding(.leading, 4)
                 }
                 TextEditor(text: $description)
                     .frame(minHeight: 80)
@@ -125,6 +127,7 @@ struct CreateEventView: View {
                     TextField("0", text: $priceMin)
                         .keyboardType(.decimalPad)
                         .foregroundColor(.textPrimary)
+                        .onChange(of: priceMin) { priceError = nil }
                 }
                 HStack {
                     Text("Max $")
@@ -132,6 +135,12 @@ struct CreateEventView: View {
                     TextField("0", text: $priceMax)
                         .keyboardType(.decimalPad)
                         .foregroundColor(.textPrimary)
+                        .onChange(of: priceMax) { priceError = nil }
+                }
+                if let err = priceError {
+                    Text(err)
+                        .font(.captionSmall)
+                        .foregroundColor(.red)
                 }
             }
         }
@@ -156,8 +165,16 @@ struct CreateEventView: View {
             Toggle("Set capacity limit", isOn: $hasCapacity)
                 .foregroundColor(.textPrimary)
             if hasCapacity {
-                Stepper("Capacity: \(capacity)", value: $capacity, in: 1...10000, step: 10)
-                    .foregroundColor(.textPrimary)
+                HStack {
+                    Text("Max attendees")
+                        .foregroundColor(.textPrimary)
+                    Spacer()
+                    TextField("50", text: $capacityText)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundColor(.textPrimary)
+                        .frame(width: 80)
+                }
             }
         }
     }
@@ -170,11 +187,39 @@ struct CreateEventView: View {
         !venueAddress.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
+    private func validateFields() -> String? {
+        if title.trimmingCharacters(in: .whitespaces).isEmpty {
+            return "Please enter an event title."
+        }
+        if venueName.trimmingCharacters(in: .whitespaces).isEmpty {
+            return "Please enter a venue name."
+        }
+        if venueAddress.trimmingCharacters(in: .whitespaces).isEmpty {
+            return "Please enter the venue address."
+        }
+        if isPaid {
+            let min = Double(priceMin) ?? 0
+            let max = Double(priceMax) ?? 0
+            if !priceMin.isEmpty && !priceMax.isEmpty && min > max {
+                priceError = "Min price can't be greater than max price."
+                return "Fix pricing before posting."
+            }
+        }
+        return nil
+    }
+
     // MARK: - Submit
 
     private func submit() async {
         geocodeError = nil
         errorMessage = nil
+        priceError = nil
+
+        if let err = validateFields() {
+            errorMessage = err
+            return
+        }
+
         isSubmitting = true
         defer { isSubmitting = false }
 
@@ -208,7 +253,7 @@ struct CreateEventView: View {
             end_time: hasEndTime ? endDate : nil,
             price_min: isPaid ? Double(priceMin) : nil,
             price_max: isPaid ? Double(priceMax) : nil,
-            capacity: hasCapacity ? capacity : nil,
+            capacity: hasCapacity ? (Int(capacityText) ?? 50) : nil,
             category: category,
             tags: [],
             group_id: groupId

@@ -28,6 +28,9 @@ struct PlansView: View {
     @StateObject private var viewModel = PlansViewModel()
     @State private var showCreatePlan = false
     @State private var selectedSegment = 0
+    @State private var showCreateGroup = false
+    @State private var showJoinGroup = false
+    @State private var showCreateActivity = false
     @EnvironmentObject var appState: AppState
 
     private var activePlans: [Plan] { viewModel.plans.filter { $0.status != .archived } }
@@ -55,9 +58,9 @@ struct PlansView: View {
                             plansList
                         }
                     case 1:
-                        GroupsViewEmbedded()
+                        GroupsViewEmbedded(showCreate: $showCreateGroup, showJoin: $showJoinGroup)
                     case 2:
-                        ActivityFeedViewEmbedded()
+                        ActivityFeedViewEmbedded(showCreate: $showCreateActivity)
                     default:
                         EmptyView()
                     }
@@ -71,12 +74,22 @@ struct PlansView: View {
                         .foregroundColor(.textPrimary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        if selectedSegment == 0 { showCreatePlan = true }
-                    } label: {
-                        Image(systemName: "plus")
-                            .foregroundColor(.ember)
-                            .opacity(selectedSegment == 0 ? 1 : 0)
+                    if selectedSegment == 1 {
+                        Menu {
+                            Button("Create Group") { showCreateGroup = true }
+                            Button("Join via Code") { showJoinGroup = true }
+                        } label: {
+                            Image(systemName: "plus")
+                                .foregroundColor(.ember)
+                        }
+                    } else {
+                        Button {
+                            if selectedSegment == 0 { showCreatePlan = true }
+                            else if selectedSegment == 2 { showCreateActivity = true }
+                        } label: {
+                            Image(systemName: "plus")
+                                .foregroundColor(.ember)
+                        }
                     }
                 }
             }
@@ -267,8 +280,8 @@ struct PlanRowView: View {
 
 struct GroupsViewEmbedded: View {
     @StateObject private var viewModel = GroupsViewModel()
-    @State private var showCreate = false
-    @State private var showJoin = false
+    @Binding var showCreate: Bool
+    @Binding var showJoin: Bool
 
     var body: some View {
         ZStack {
@@ -280,9 +293,13 @@ struct GroupsViewEmbedded: View {
                     Text("Create a private space for your crew.")
                         .font(.bodyMedium).foregroundColor(.textSecondary)
                         .multilineTextAlignment(.center).padding(.horizontal, Spacing.xxxl)
-                    HStack(spacing: Spacing.base) {
-                        Button("Create") { showCreate = true }.buttonStyle(PrimaryButtonStyle())
-                        Button("Join") { showJoin = true }.buttonStyle(SecondaryButtonStyle())
+                    HStack(spacing: Spacing.sm) {
+                        Button("Create") { showCreate = true }
+                            .buttonStyle(PrimaryButtonStyle())
+                            .fixedSize()
+                        Button("Join") { showJoin = true }
+                            .buttonStyle(SecondaryButtonStyle())
+                            .fixedSize()
                     }
                 }
             } else {
@@ -301,24 +318,13 @@ struct GroupsViewEmbedded: View {
         }
         .sheet(isPresented: $showCreate) { CreateGroupSheet(viewModel: viewModel) }
         .sheet(isPresented: $showJoin) { JoinGroupSheet(viewModel: viewModel) }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("Create Group") { showCreate = true }
-                    Button("Join via Code") { showJoin = true }
-                } label: {
-                    Image(systemName: "plus")
-                        .foregroundColor(.ember)
-                }
-            }
-        }
         .task { await viewModel.load() }
     }
 }
 
 struct ActivityFeedViewEmbedded: View {
     @StateObject private var viewModel = ActivityViewModel()
-    @State private var showCreate = false
+    @Binding var showCreate: Bool
 
     var body: some View {
         ZStack {
@@ -330,7 +336,9 @@ struct ActivityFeedViewEmbedded: View {
                     Text("Post an activity to find others to join you.")
                         .font(.bodyMedium).foregroundColor(.textSecondary)
                         .multilineTextAlignment(.center).padding(.horizontal, Spacing.xxxl)
-                    Button("Post Activity") { showCreate = true }.buttonStyle(PrimaryButtonStyle())
+                    Button("Post Activity") { showCreate = true }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .fixedSize()
                 }
             } else {
                 ScrollView(showsIndicators: false) {
@@ -351,16 +359,6 @@ struct ActivityFeedViewEmbedded: View {
         .sheet(isPresented: $showCreate) {
             CreateActivityView(groupId: nil) { post in
                 viewModel.posts.insert(post, at: 0)
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showCreate = true
-                } label: {
-                    Image(systemName: "plus")
-                        .foregroundColor(.ember)
-                }
             }
         }
         .task { await viewModel.load() }

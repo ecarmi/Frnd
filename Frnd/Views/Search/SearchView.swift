@@ -61,6 +61,8 @@ final class SearchViewModel: ObservableObject {
 struct SearchView: View {
     @StateObject private var viewModel = SearchViewModel()
     @State private var showEventDetail: Event?
+    @State private var plans: [Plan] = []
+    @State private var showPlanDetail: Plan?
 
     var body: some View {
         NavigationStack {
@@ -119,9 +121,17 @@ struct SearchView: View {
                         .foregroundColor(.textPrimary)
                 }
             }
-            .task { await viewModel.loadTrending() }
+            .task {
+                await viewModel.loadTrending()
+                plans = (try? await APIService.shared.fetchMyPlans()) ?? []
+            }
             .sheet(item: $showEventDetail) { event in
                 EventDetailView(event: event)
+            }
+            .sheet(item: $showPlanDetail) { plan in
+                NavigationStack {
+                    PlanDetailView(plan: plan)
+                }
             }
         }
     }
@@ -156,6 +166,39 @@ struct SearchView: View {
                         }
                     }
                     .padding(.horizontal, Spacing.base)
+                }
+            }
+
+            // Active plans
+            if !plans.isEmpty {
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    sectionLabel("Your Plans")
+                        .padding(.horizontal, Spacing.base)
+
+                    ForEach(plans.prefix(5)) { plan in
+                        Button {
+                            showPlanDetail = plan
+                        } label: {
+                            HStack(spacing: Spacing.md) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(plan.title)
+                                        .font(.headingSmall)
+                                        .foregroundColor(.textPrimary)
+                                    Text("\(plan.members.count) member\(plan.members.count == 1 ? "" : "s") · \(plan.status.rawValue.capitalized)")
+                                        .font(.captionMedium)
+                                        .foregroundColor(.textSecondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.captionSmall)
+                                    .foregroundColor(.textTertiary)
+                            }
+                            .padding(Spacing.md)
+                            .cardStyle()
+                            .padding(.horizontal, Spacing.base)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
 

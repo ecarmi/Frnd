@@ -37,8 +37,8 @@ struct MainTabView: View {
         }
         .ignoresSafeArea(edges: .bottom)
         .appBackground()
-        .onChange(of: appState.pendingDeepLink) { link in
-            guard let link else { return }
+        .onChange(of: appState.pendingDeepLink) {
+            guard let link = appState.pendingDeepLink else { return }
             Task {
                 await handleDeepLink(link)
                 appState.pendingDeepLink = nil
