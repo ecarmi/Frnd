@@ -1,5 +1,6 @@
 import logging
 import traceback
+import uuid
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import JSONResponse
@@ -82,20 +83,20 @@ async def create_event(
     if not body.venue_id and not body.venue:
         raise HTTPException(status_code=400, detail="Provide either venue_id or venue details")
 
-    if body.venue_id:
-        venue_result = await db.execute(select(Venue).where(Venue.id == body.venue_id))
-        if not venue_result.scalar_one_or_none():
-            raise HTTPException(status_code=404, detail="Venue not found")
-        venue_id = body.venue_id
-    else:
-        v = body.venue
-        venue = Venue(name=v.name, address=v.address, latitude=v.latitude, longitude=v.longitude)
-        db.add(venue)
-        await db.flush()
-        venue_id = venue.id
-
     try:
-        event = Event(
+        if body.venue_id:
+            venue_result = await db.execute(select(Venue).where(Venue.id == body.venue_id))
+            if not venue_result.scalar_one_or_none():
+                raise HTTPException(status_code=404, detail="Venue not found")
+            venue_id = body.venue_id
+        else:
+            v = body.venue
+            venue_id = str(uuid.uuid4())
+            db.add(Venue(id=venue_id, name=v.name, address=v.address, latitude=v.latitude, longitude=v.longitude))
+
+        event_id = str(uuid.uuid4())
+        db.add(Event(
+            id=event_id,
             title=body.title,
             description=body.description,
             venue_id=venue_id,
@@ -110,12 +111,11 @@ async def create_event(
             group_id=body.group_id,
             source="user_created",
             creator_id=current_user.id,
-        )
-        db.add(event)
+        ))
         await db.commit()
 
         result = await db.execute(
-            select(Event).options(selectinload(Event.venue)).where(Event.id == event.id)
+            select(Event).options(selectinload(Event.venue)).where(Event.id == event_id)
         )
         event = result.scalar_one()
         return await build_feed_event_out(event, current_user, db)
