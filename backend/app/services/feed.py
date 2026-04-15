@@ -222,6 +222,8 @@ async def get_feed(
 
 
 def _ai_reason(event: Event, friends_going: list[User], user: User) -> str:
+    category = event.category.value if hasattr(event.category, "value") else str(event.category)
+
     if friends_going:
         names = [f.name.split()[0] for f in friends_going[:2]]
         extra = len(friends_going) - 2
@@ -230,9 +232,9 @@ def _ai_reason(event: Event, friends_going: list[User], user: User) -> str:
         return f"{', '.join(names)} going"
     if event.trending_score > 0.8:
         return f"Trending in Chicago"
-    if event.category.value == "music":
+    if category == "music":
         return "Based on your music taste"
-    if event.category.value == "nightlife":
+    if category == "nightlife":
         return "Popular on Friday nights"
     return f"Matches your vibe"
 

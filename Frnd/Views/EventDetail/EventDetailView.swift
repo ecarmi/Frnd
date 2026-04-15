@@ -4,15 +4,14 @@ import MapKit
 struct EventDetailView: View {
     let event: Event
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var savedEventsStore: SavedEventsStore
     @State private var rsvpStatus: RSVPStatus?
-    @State private var isSaved: Bool
     @State private var showCreatePlan = false
     @State private var isRSVPLoading = false
 
     init(event: Event) {
         self.event = event
         _rsvpStatus = State(initialValue: event.userRSVPStatus)
-        _isSaved = State(initialValue: event.isSaved)
     }
 
     var body: some View {
@@ -196,7 +195,9 @@ struct EventDetailView: View {
     // MARK: - Action Buttons
 
     private var actionButtons: some View {
-        HStack(spacing: Spacing.md) {
+        let isSaved = savedEventsStore.isSaved(event)
+
+        return HStack(spacing: Spacing.md) {
             // RSVP / Buy
             Button {
                 toggleRSVP()
@@ -223,8 +224,7 @@ struct EventDetailView: View {
 
             // Save
             Button {
-                isSaved.toggle()
-                Task { try? await isSaved ? APIService.shared.saveEvent(eventId: event.id) : APIService.shared.unsaveEvent(eventId: event.id) }
+                Task { try? await savedEventsStore.toggle(event: event) }
             } label: {
                 Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
                     .font(.system(size: 20))

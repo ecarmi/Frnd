@@ -4,11 +4,13 @@ struct CreatePlanView: View {
     let prefillEvent: Event?
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject private var savedEventsStore: SavedEventsStore
     @State private var title: String = ""
     @State private var selectedEventIds: Set<String> = []
     @State private var inviteeIds: Set<String> = []
     @State private var isLoading = false
     @State private var friends: [Friendship] = []
+    @State private var savedEvents: [Event] = []
     @State private var errorMessage: String?
 
     init(prefillEvent: Event?) {
@@ -71,6 +73,8 @@ struct CreatePlanView: View {
                                 .padding(Spacing.base)
                                 .cardStyle()
                             }
+                        } else {
+                            savedEventsSection
                         }
 
                         // Invite friends
@@ -136,6 +140,9 @@ struct CreatePlanView: View {
         }
         .task {
             friends = (try? await APIService.shared.fetchFriends()) ?? []
+            let fetchedSavedEvents = (try? await APIService.shared.fetchSavedEvents()) ?? savedEventsStore.savedEvents
+            savedEvents = fetchedSavedEvents
+            savedEventsStore.replaceSavedEvents(fetchedSavedEvents)
         }
     }
 
@@ -152,6 +159,64 @@ struct CreatePlanView: View {
                 dismiss()
             } catch {
                 errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private var savedEventsSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text("Saved Events")
+                .font(.mono)
+                .foregroundColor(.textTertiary)
+                .textCase(.uppercase)
+                .tracking(1.5)
+
+            if savedEvents.isEmpty {
+                Text("Bookmark events from the feed, then start a plan around them here.")
+                    .font(.bodyMedium)
+                    .foregroundColor(.textSecondary)
+                    .padding(Spacing.base)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.bgRaised)
+                    .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+                    .overlay(RoundedRectangle(cornerRadius: Radius.md).strokeBorder(Color.bgBorder))
+            } else {
+                ForEach(savedEvents) { event in
+                    Button {
+                        if selectedEventIds.contains(event.id) {
+                            selectedEventIds.remove(event.id)
+                            if title == event.title {
+                                title = ""
+                            }
+                        } else {
+                            selectedEventIds = [event.id]
+                            if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                title = event.title
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: Spacing.md) {
+                            Text(event.category.emoji)
+                                .font(.system(size: 24))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(event.title)
+                                    .font(.headingSmall)
+                                    .foregroundColor(.textPrimary)
+                                    .multilineTextAlignment(.leading)
+                                Text("\(event.startTime.relativeEventTime) · \(event.venue.name)")
+                                    .font(.captionMedium)
+                                    .foregroundColor(.textSecondary)
+                            }
+                            Spacer()
+                            Image(systemName: selectedEventIds.contains(event.id) ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 22))
+                                .foregroundColor(selectedEventIds.contains(event.id) ? .ember : .textTertiary)
+                        }
+                        .padding(Spacing.md)
+                        .cardStyle()
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
     }

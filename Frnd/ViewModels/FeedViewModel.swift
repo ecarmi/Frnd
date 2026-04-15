@@ -39,6 +39,7 @@ final class FeedViewModel: ObservableObject {
             } else {
                 events.append(contentsOf: response.events)
             }
+            SavedEventsStore.shared.bootstrap(from: response.events)
             nextCursor = response.nextCursor
             hasMore = response.nextCursor != nil
         } catch {
@@ -63,17 +64,6 @@ final class FeedViewModel: ObservableObject {
         events.removeAll { $0.id == event.id }
         // Record feedback
         try? await APIService.shared.recordSwipe(eventId: event.id, direction: direction)
-    }
-
-    func toggleSave(eventId: String) {
-        guard let index = events.firstIndex(where: { $0.id == eventId }) else { return }
-        events[index].isSaved.toggle()
-        let isSaved = events[index].isSaved
-        Task {
-            try? await isSaved
-                ? APIService.shared.saveEvent(eventId: eventId)
-                : APIService.shared.unsaveEvent(eventId: eventId)
-        }
     }
 
     func rsvp(eventId: String, status: RSVPStatus) async {

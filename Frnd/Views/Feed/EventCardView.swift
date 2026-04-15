@@ -5,6 +5,7 @@ struct EventCardView: View {
     let onSave: () -> Void
     let onRSVP: () -> Void
 
+    @EnvironmentObject private var savedEventsStore: SavedEventsStore
     @State private var showDetail = false
 
     var body: some View {
@@ -135,14 +136,22 @@ struct EventCardView: View {
     // MARK: - Action Row
 
     private var actionRow: some View {
-        HStack(spacing: 0) {
+        let isSaved = savedEventsStore.isSaved(event)
+
+        return HStack(spacing: 0) {
             ActionButton(
-                icon: event.isSaved ? "bookmark.fill" : "bookmark",
-                color: event.isSaved ? .ember : .textTertiary,
+                icon: isSaved ? "bookmark.fill" : "bookmark",
+                color: isSaved ? .ember : .textTertiary,
                 action: onSave
             )
             Spacer()
-            ActionButton(icon: "paperplane", color: .textTertiary) {}
+            ShareLink(item: shareText) {
+                Image(systemName: "paperplane")
+                    .font(.system(size: 20))
+                    .foregroundColor(.textTertiary)
+                    .frame(width: 40, height: 36)
+                    .contentShape(Rectangle())
+            }
             Spacer()
             Button(action: onRSVP) {
                 HStack(spacing: 6) {
@@ -160,6 +169,10 @@ struct EventCardView: View {
                 .clipShape(Capsule())
             }
         }
+    }
+
+    private var shareText: String {
+        "\(event.title) at \(event.venue.name) on \(event.startTime.formatted(date: .abbreviated, time: .shortened)). Check it out on Frnd."
     }
 }
 

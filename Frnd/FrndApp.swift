@@ -3,11 +3,13 @@ import SwiftUI
 @main
 struct FrndApp: App {
     @StateObject private var appState = AppState.shared
+    @StateObject private var savedEventsStore = SavedEventsStore.shared
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
+                .environmentObject(savedEventsStore)
                 .preferredColorScheme(.dark)
                 .onOpenURL { url in
                     appState.handleDeepLink(url)

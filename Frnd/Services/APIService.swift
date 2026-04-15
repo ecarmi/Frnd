@@ -323,6 +323,10 @@ final class APIService: ObservableObject {
         try await request(path: "/groups")
     }
 
+    func fetchPublicGroups() async throws -> [Group] {
+        try await request(path: "/groups/public")
+    }
+
     func fetchGroup(id: String) async throws -> Group {
         try await request(path: "/groups/\(id)")
     }

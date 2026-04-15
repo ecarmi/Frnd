@@ -115,9 +115,14 @@ struct GroupsView: View {
             HStack(spacing: Spacing.base) {
                 Button("Create") { showCreate = true }
                     .buttonStyle(PrimaryButtonStyle())
+                    .frame(maxWidth: .infinity)
                 Button("Join") { showJoin = true }
                     .buttonStyle(SecondaryButtonStyle())
+                    .frame(maxWidth: .infinity)
             }
+            .frame(maxWidth: 420)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, Spacing.xl)
         }
     }
 }

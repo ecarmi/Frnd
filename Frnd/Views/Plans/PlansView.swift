@@ -24,13 +24,27 @@ final class PlansViewModel: ObservableObject {
     }
 }
 
+@MainActor
+final class PublicGroupsViewModel: ObservableObject {
+    @Published var groups: [Group] = []
+    @Published var isLoading = false
+
+    func load() async {
+        isLoading = true
+        defer { isLoading = false }
+        groups = (try? await APIService.shared.fetchPublicGroups()) ?? []
+    }
+}
+
 struct PlansView: View {
     @StateObject private var viewModel = PlansViewModel()
+    @StateObject private var publicGroupsViewModel = PublicGroupsViewModel()
+    @EnvironmentObject private var savedEventsStore: SavedEventsStore
     @State private var showCreatePlan = false
+    @State private var prefillEvent: Event?
     @State private var selectedSegment = 0
     @State private var showCreateGroup = false
     @State private var showJoinGroup = false
-    @State private var showCreateActivity = false
     @EnvironmentObject var appState: AppState
 
     private var activePlans: [Plan] { viewModel.plans.filter { $0.status != .archived } }
@@ -60,7 +74,7 @@ struct PlansView: View {
                     case 1:
                         GroupsViewEmbedded(showCreate: $showCreateGroup, showJoin: $showJoinGroup)
                     case 2:
-                        ActivityFeedViewEmbedded(showCreate: $showCreateActivity)
+                        PublicGroupsViewEmbedded(viewModel: publicGroupsViewModel)
                     default:
                         EmptyView()
                     }
@@ -69,7 +83,7 @@ struct PlansView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text(["Plans", "Groups", "LFG"][selectedSegment])
+                    Text(["Plans", "My Groups", "Public Groups"][selectedSegment])
                         .font(.headingMedium)
                         .foregroundColor(.textPrimary)
                 }
@@ -85,26 +99,33 @@ struct PlansView: View {
                     } else {
                         Button {
                             if selectedSegment == 0 { showCreatePlan = true }
-                            else if selectedSegment == 2 { showCreateActivity = true }
                         } label: {
                             Image(systemName: "plus")
                                 .foregroundColor(.ember)
                         }
+                        .opacity(selectedSegment == 0 ? 1 : 0)
+                        .disabled(selectedSegment != 0)
                     }
                 }
             }
         }
         .sheet(isPresented: $showCreatePlan, onDismiss: {
+            prefillEvent = nil
             Task { await viewModel.loadPlans() }
         }) {
-            CreatePlanView(prefillEvent: nil)
+            CreatePlanView(prefillEvent: prefillEvent)
         }
-        .task { await viewModel.loadPlans() }
+        .task {
+            await viewModel.loadPlans()
+            await publicGroupsViewModel.load()
+            let savedEvents = (try? await APIService.shared.fetchSavedEvents()) ?? savedEventsStore.savedEvents
+            savedEventsStore.replaceSavedEvents(savedEvents)
+        }
     }
 
     private var segmentPicker: some View {
         HStack(spacing: Spacing.sm) {
-            ForEach(Array(["Plans", "Groups", "LFG"].enumerated()), id: \.offset) { idx, label in
+            ForEach(Array(["Plans", "My Groups", "Public Groups"].enumerated()), id: \.offset) { idx, label in
                 Button {
                     withAnimation(.spring(response: 0.25)) { selectedSegment = idx }
                 } label: {
@@ -129,6 +150,16 @@ struct PlansView: View {
     private var plansList: some View {
         ScrollView(showsIndicators: false) {
             LazyVStack(alignment: .leading, spacing: Spacing.base) {
+                if !savedEventsStore.savedEvents.isEmpty {
+                    sectionHeader("Saved Events", count: savedEventsStore.savedEvents.count)
+                    ForEach(savedEventsStore.savedEvents.prefix(4)) { event in
+                        SavedEventPlanRow(event: event) {
+                            prefillEvent = event
+                            showCreatePlan = true
+                        }
+                    }
+                }
+
                 // Active plans
                 if !activePlans.isEmpty {
                     sectionHeader("Active Plans", count: activePlans.count)
@@ -195,6 +226,46 @@ struct PlansView: View {
     }
 }
 
+private struct SavedEventPlanRow: View {
+    let event: Event
+    let onStartPlan: () -> Void
+
+    var body: some View {
+        HStack(spacing: Spacing.md) {
+            ZStack {
+                RoundedRectangle(cornerRadius: Radius.sm)
+                    .fill(Color.categoryColor(for: event.category).opacity(0.18))
+                    .frame(width: 46, height: 46)
+                Text(event.category.emoji)
+                    .font(.system(size: 22))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(event.title)
+                    .font(.headingSmall)
+                    .foregroundColor(.textPrimary)
+                    .lineLimit(1)
+                Text("\(event.startTime.relativeEventTime) · \(event.venue.name)")
+                    .font(.captionMedium)
+                    .foregroundColor(.textSecondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Button("Start Plan", action: onStartPlan)
+                .font(.captionMedium)
+                .foregroundColor(.ember)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.ember.opacity(0.12))
+                .clipShape(Capsule())
+        }
+        .padding(Spacing.md)
+        .cardStyle()
+    }
+}
+
 // MARK: - Plan Row
 
 struct PlanRowView: View {
@@ -253,7 +324,7 @@ struct PlanRowView: View {
                         .foregroundColor(.gold)
                 }
                 Spacer()
-                Text(plan.createdAt, style: .relative)
+                Text(createdAtLabel)
                     .font(.captionSmall)
                     .foregroundColor(.textTertiary)
             }
@@ -273,6 +344,10 @@ struct PlanRowView: View {
             }
         }()
         return PillView(text: label, color: color)
+    }
+
+    private var createdAtLabel: String {
+        plan.createdAt.formatted(date: .abbreviated, time: .omitted)
     }
 }
 
@@ -296,11 +371,14 @@ struct GroupsViewEmbedded: View {
                     HStack(spacing: Spacing.sm) {
                         Button("Create") { showCreate = true }
                             .buttonStyle(PrimaryButtonStyle())
-                            .fixedSize()
+                            .frame(maxWidth: .infinity)
                         Button("Join") { showJoin = true }
                             .buttonStyle(SecondaryButtonStyle())
-                            .fixedSize()
+                            .frame(maxWidth: .infinity)
                     }
+                    .frame(maxWidth: 420)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, Spacing.xl)
                 }
             } else {
                 ScrollView(showsIndicators: false) {
@@ -322,33 +400,25 @@ struct GroupsViewEmbedded: View {
     }
 }
 
-struct ActivityFeedViewEmbedded: View {
-    @StateObject private var viewModel = ActivityViewModel()
-    @Binding var showCreate: Bool
+struct PublicGroupsViewEmbedded: View {
+    @ObservedObject var viewModel: PublicGroupsViewModel
 
     var body: some View {
         ZStack {
             Color.bgPrimary.ignoresSafeArea()
-            if viewModel.posts.isEmpty && !viewModel.isLoading {
+            if viewModel.groups.isEmpty && !viewModel.isLoading {
                 VStack(spacing: Spacing.xl) {
-                    Text("🙋").font(.system(size: 56))
-                    Text("No activity posts").font(.headingMedium).foregroundColor(.textPrimary)
-                    Text("Post an activity to find others to join you.")
+                    Text("🌍").font(.system(size: 56))
+                    Text("No public groups").font(.headingMedium).foregroundColor(.textPrimary)
+                    Text("Public groups will appear here once people start opening them up.")
                         .font(.bodyMedium).foregroundColor(.textSecondary)
                         .multilineTextAlignment(.center).padding(.horizontal, Spacing.xxxl)
-                    Button("Post Activity") { showCreate = true }
-                        .buttonStyle(PrimaryButtonStyle())
-                        .fixedSize()
                 }
             } else {
                 ScrollView(showsIndicators: false) {
                     LazyVStack(spacing: Spacing.base) {
-                        ForEach(viewModel.posts) { post in
-                            ActivityPostCard(post: post) { updated in
-                                if let idx = viewModel.posts.firstIndex(where: { $0.id == updated.id }) {
-                                    viewModel.posts[idx] = updated
-                                }
-                            }
+                        ForEach(viewModel.groups) { group in
+                            GroupRowView(group: group)
                         }
                         Color.clear.frame(height: 88)
                     }
@@ -356,12 +426,5 @@ struct ActivityFeedViewEmbedded: View {
                 }
             }
         }
-        .sheet(isPresented: $showCreate) {
-            CreateActivityView(groupId: nil) { post in
-                viewModel.posts.insert(post, at: 0)
-            }
-        }
-        .task { await viewModel.load() }
     }
 }
-

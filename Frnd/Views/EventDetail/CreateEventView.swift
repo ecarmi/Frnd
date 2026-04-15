@@ -6,6 +6,7 @@ struct CreateEventView: View {
     var onCreated: ((Event) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var focusedField: Field?
 
     // Form fields
     @State private var title = ""
@@ -15,8 +16,7 @@ struct CreateEventView: View {
     @State private var hasEndTime = false
     @State private var endDate = Date().addingTimeInterval(7200)
     @State private var isPaid = false
-    @State private var priceMin = ""
-    @State private var priceMax = ""
+    @State private var priceText = ""
     @State private var venueName = ""
     @State private var venueAddress = ""
     @State private var hasCapacity = false
@@ -27,6 +27,11 @@ struct CreateEventView: View {
     @State private var errorMessage: String?
     @State private var geocodeError: String?
     @State private var priceError: String?
+
+    private enum Field: Hashable {
+        case price
+        case capacity
+    }
 
     var body: some View {
         NavigationStack {
@@ -40,6 +45,11 @@ struct CreateEventView: View {
                     venueSection
                     capacitySection
                 }
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        focusedField = nil
+                    }
+                )
                 .scrollContentBackground(.hidden)
             }
             .navigationTitle("Post Event")
@@ -56,6 +66,11 @@ struct CreateEventView: View {
                     .foregroundColor(.ember)
                     .fontWeight(.semibold)
                     .disabled(!isFormValid || isSubmitting)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focusedField = nil }
+                        .foregroundColor(.ember)
                 }
             }
             .overlay {
@@ -122,20 +137,13 @@ struct CreateEventView: View {
                 .foregroundColor(.textPrimary)
             if isPaid {
                 HStack {
-                    Text("Min $")
+                    Text("Price $")
                         .foregroundColor(.textSecondary)
-                    TextField("0", text: $priceMin)
+                    TextField("0", text: $priceText)
                         .keyboardType(.decimalPad)
+                        .focused($focusedField, equals: .price)
                         .foregroundColor(.textPrimary)
-                        .onChange(of: priceMin) { priceError = nil }
-                }
-                HStack {
-                    Text("Max $")
-                        .foregroundColor(.textSecondary)
-                    TextField("0", text: $priceMax)
-                        .keyboardType(.decimalPad)
-                        .foregroundColor(.textPrimary)
-                        .onChange(of: priceMax) { priceError = nil }
+                        .onChange(of: priceText) { priceError = nil }
                 }
                 if let err = priceError {
                     Text(err)
@@ -171,6 +179,7 @@ struct CreateEventView: View {
                     Spacer()
                     TextField("50", text: $capacityText)
                         .keyboardType(.numberPad)
+                        .focused($focusedField, equals: .capacity)
                         .multilineTextAlignment(.trailing)
                         .foregroundColor(.textPrimary)
                         .frame(width: 80)
@@ -198,10 +207,8 @@ struct CreateEventView: View {
             return "Please enter the venue address."
         }
         if isPaid {
-            let min = Double(priceMin) ?? 0
-            let max = Double(priceMax) ?? 0
-            if !priceMin.isEmpty && !priceMax.isEmpty && min > max {
-                priceError = "Min price can't be greater than max price."
+            if Double(priceText) == nil {
+                priceError = "Enter a valid price."
                 return "Fix pricing before posting."
             }
         }
@@ -211,6 +218,7 @@ struct CreateEventView: View {
     // MARK: - Submit
 
     private func submit() async {
+        focusedField = nil
         geocodeError = nil
         errorMessage = nil
         priceError = nil
@@ -251,8 +259,8 @@ struct CreateEventView: View {
             ),
             start_time: startDate,
             end_time: hasEndTime ? endDate : nil,
-            price_min: isPaid ? Double(priceMin) : nil,
-            price_max: isPaid ? Double(priceMax) : nil,
+            price_min: isPaid ? Double(priceText) : nil,
+            price_max: isPaid ? Double(priceText) : nil,
             capacity: hasCapacity ? (Int(capacityText) ?? 50) : nil,
             category: category,
             tags: [],
@@ -268,4 +276,3 @@ struct CreateEventView: View {
         }
     }
 }
-

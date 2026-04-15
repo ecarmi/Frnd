@@ -66,6 +66,21 @@ async def list_my_groups(
     return [_group_out(g) for g in groups]
 
 
+@router.get("/public", response_model=list[GroupOut])
+async def list_public_groups(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Group)
+        .options(selectinload(Group.members).selectinload(GroupMembership.user).selectinload(User.taste_profile))
+        .where(Group.is_private == False)
+        .order_by(Group.created_at.desc())
+    )
+    groups = result.scalars().unique().all()
+    return [_group_out(g) for g in groups]
+
+
 @router.post("", response_model=GroupOut, status_code=201)
 async def create_group(
     body: GroupCreate,

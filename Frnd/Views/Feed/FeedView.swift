@@ -2,6 +2,7 @@ import SwiftUI
 
 struct FeedView: View {
     @StateObject private var viewModel = FeedViewModel()
+    @EnvironmentObject private var savedEventsStore: SavedEventsStore
     @State private var selectedFilter: TimeFilter = .all
     @State private var showCreateEvent = false
 
@@ -76,6 +77,7 @@ struct FeedView: View {
         }
         .task {
             await viewModel.loadFeed(refresh: true)
+            savedEventsStore.bootstrap(from: viewModel.events)
         }
     }
 
@@ -134,7 +136,7 @@ struct FeedView: View {
                             EventCardView(
                                 event: event,
                                 onSave: {
-                                    viewModel.toggleSave(eventId: event.id)
+                                    Task { try? await savedEventsStore.toggle(event: event) }
                                 },
                                 onRSVP: {
                                     Task {
@@ -166,6 +168,7 @@ struct FeedView: View {
         }
         .refreshable {
             await viewModel.loadFeed(refresh: true)
+            savedEventsStore.bootstrap(from: viewModel.events)
         }
     }
 

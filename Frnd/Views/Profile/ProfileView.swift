@@ -11,7 +11,7 @@ final class ProfileViewModel: ObservableObject {
     @Published var friends: [Friendship] = []
     @Published var isLoading = false
 
-    func load() async {
+    func load(savedEventsStore: SavedEventsStore) async {
         isLoading = true
         defer { isLoading = false }
         async let friendsResult = try? APIService.shared.fetchFriends()
@@ -20,6 +20,7 @@ final class ProfileViewModel: ObservableObject {
         async let myEventsResult = try? APIService.shared.fetchMyCreatedEvents()
         friends = (await friendsResult) ?? []
         savedEvents = (await savedResult) ?? []
+        savedEventsStore.replaceSavedEvents(savedEvents)
         attendedEvents = (await attendedResult) ?? []
         myEvents = (await myEventsResult) ?? []
     }
@@ -27,6 +28,7 @@ final class ProfileViewModel: ObservableObject {
 
 struct ProfileView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject private var savedEventsStore: SavedEventsStore
     @StateObject private var viewModel = ProfileViewModel()
     @State private var showSettings = false
     @State private var showEditName = false
@@ -72,7 +74,7 @@ struct ProfileView: View {
         .sheet(isPresented: $showEditName) {
             EditNameSheet()
         }
-        .task { await viewModel.load() }
+        .task { await viewModel.load(savedEventsStore: savedEventsStore) }
     }
 
     // MARK: - Profile Header
@@ -108,14 +110,6 @@ struct ProfileView: View {
                         .foregroundColor(.textTertiary)
                 }
             }
-
-            // Stats row
-            HStack(spacing: Spacing.xxxl) {
-                StatView(value: "\(viewModel.attendedEvents.count)", label: "Attended")
-                StatView(value: "\(viewModel.savedEvents.count)", label: "Saved")
-                StatView(value: "\(viewModel.friends.count)", label: "Friends")
-            }
-            .padding(.top, Spacing.sm)
 
             // Invite button
             ShareLink(item: "Join me on Frnd — the app for discovering campus events and making plans with friends. Download it here: https://frnd.app") {
@@ -308,26 +302,6 @@ struct ProfileView: View {
                     }
                 }
             }
-        }
-    }
-}
-
-// MARK: - Sub Views
-
-private struct StatView: View {
-    let value: String
-    let label: String
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.headingLarge)
-                .foregroundColor(.textPrimary)
-            Text(label)
-                .font(.captionSmall)
-                .foregroundColor(.textSecondary)
-                .textCase(.uppercase)
-                .tracking(1)
         }
     }
 }
