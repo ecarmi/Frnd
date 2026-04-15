@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from .database import engine
 from .routers import auth, users, events, feed, plans, feedback, groups, activities, carpools
@@ -14,6 +15,13 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("Starting Frnd API")
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        logger.info("Database connectivity check passed")
+    except Exception:
+        logger.exception("Database connectivity check failed during startup")
     yield
 
 

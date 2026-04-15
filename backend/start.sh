@@ -1,6 +1,11 @@
 #!/bin/sh
+set -eu
+
 # Run migrations with a 30-second timeout so a hung DB connection
 # doesn't prevent uvicorn from starting.
+echo "==> Environment: ${ENVIRONMENT:-unknown}"
+echo "==> Port: ${PORT:-8000}"
+echo "==> Database URL present: $( [ -n "${DATABASE_URL:-}" ] && echo yes || echo no )"
 echo "==> Running migrations..."
 python -c "
 import subprocess, sys

@@ -21,8 +21,17 @@ from app.config import settings
 
 target_metadata = Base.metadata
 
+def _async_db_url(url: str) -> str:
+    """Normalize Railway/Postgres URLs to an asyncpg-compatible SQLAlchemy URL."""
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+asyncpg://", 1)
+    if url.startswith("postgresql://") and "+asyncpg" not in url:
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
+
 # Override the sqlalchemy.url from alembic.ini with the app's configured URL
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", _async_db_url(settings.database_url))
 
 
 def run_migrations_offline() -> None:

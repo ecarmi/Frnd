@@ -364,3 +364,4 @@ struct ActivityFeedViewEmbedded: View {
         .task { await viewModel.load() }
     }
 }
+
