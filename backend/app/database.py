@@ -2,11 +2,21 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import DeclarativeBase
 from .config import settings
 
+
+def _async_db_url(url: str) -> str:
+    """Normalize Railway's postgresql:// URL to the asyncpg scheme."""
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+asyncpg://", 1)
+    if url.startswith("postgresql://") and "+asyncpg" not in url:
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
+
 engine = create_async_engine(
-    settings.database_url,
+    _async_db_url(settings.database_url),
     echo=settings.environment == "development",
     pool_pre_ping=True,
-    connect_args={"command_timeout": 10},
+    connect_args={"command_timeout": 10, "timeout": 10},
     pool_timeout=10,
 )
 
