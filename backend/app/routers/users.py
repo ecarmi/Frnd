@@ -139,7 +139,7 @@ async def get_attended_events(
         .join(RSVP, RSVP.event_id == Event.id)
         .where(
             RSVP.user_id == current_user.id,
-            RSVP.status == RSVPStatusEnum.going,
+            RSVP.status == RSVPStatusEnum.going.value,
             Event.start_time < now,
         )
         .order_by(Event.start_time.desc())

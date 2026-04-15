@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
+from ..enum_utils import enum_equals
 from ..models import ActivityPost, ActivityParticipant, ActivityStatusEnum, User
 from ..schemas import ActivityPostOut, ActivityPostCreate, ActivityParticipantOut, UserOut
 from ..auth import get_current_user
@@ -71,7 +72,7 @@ async def list_activities(
             selectinload(ActivityPost.creator).selectinload(User.taste_profile),
             selectinload(ActivityPost.participants).selectinload(ActivityParticipant.user).selectinload(User.taste_profile),
         )
-        .where(ActivityPost.status == ActivityStatusEnum.open)
+        .where(ActivityPost.status == ActivityStatusEnum.open.value)
         .order_by(ActivityPost.scheduled_time.asc())
     )
     if group_id:
@@ -135,7 +136,7 @@ async def join_activity(
     post = await _load_post(post_id, db)
     if not post:
         raise HTTPException(status_code=404, detail="Activity not found")
-    if post.status != ActivityStatusEnum.open:
+    if not enum_equals(post.status, ActivityStatusEnum.open):
         raise HTTPException(status_code=400, detail="Activity is not open")
 
     already = any(p.user_id == current_user.id for p in post.participants)

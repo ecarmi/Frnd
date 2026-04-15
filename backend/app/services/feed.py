@@ -18,6 +18,7 @@ from sqlalchemy.orm import selectinload
 
 from ..models import User, Event, Venue, RSVP, SavedEvent, Friendship, RSVPStatusEnum
 from ..schemas import EventOut, UserOut
+from ..enum_utils import enum_equals, enum_value
 
 
 # ---------------------------------------------------------------------------
@@ -141,9 +142,9 @@ async def get_feed(
         u = friend_users.get(rsvp.user_id)
         if not u:
             continue
-        if rsvp.status == RSVPStatusEnum.going:
+        if enum_equals(rsvp.status, RSVPStatusEnum.going):
             going_map[rsvp.event_id].append(u)
-        elif rsvp.status == RSVPStatusEnum.interested:
+        elif enum_equals(rsvp.status, RSVPStatusEnum.interested):
             interested_map[rsvp.event_id].append(u)
 
     # 6. User's own saved events and RSVPs — two queries (not per-event)
@@ -161,7 +162,7 @@ async def get_feed(
     total_result = await db.execute(
         select(RSVP.event_id, RSVP.user_id).where(
             RSVP.event_id.in_(event_ids),
-            RSVP.status.in_([RSVPStatusEnum.going, RSVPStatusEnum.interested]),
+            RSVP.status.in_([RSVPStatusEnum.going.value, RSVPStatusEnum.interested.value]),
         )
     )
     total_map: dict[str, int] = {}
@@ -222,7 +223,7 @@ async def get_feed(
 
 
 def _ai_reason(event: Event, friends_going: list[User], user: User) -> str:
-    category = event.category.value if hasattr(event.category, "value") else str(event.category)
+    category = enum_value(event.category)
 
     if friends_going:
         names = [f.name.split()[0] for f in friends_going[:2]]
@@ -261,7 +262,7 @@ async def build_feed_event_out(
     for _, uid, status in all_rsvps:
         if uid == user.id:
             my_rsvp_status = status
-        if status in (RSVPStatusEnum.going, RSVPStatusEnum.interested):
+        if enum_equals(status, RSVPStatusEnum.going) or enum_equals(status, RSVPStatusEnum.interested):
             total += 1
 
     saved_result = await db.execute(

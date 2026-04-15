@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
+from ..enum_utils import enum_equals
 from ..models import Group, GroupMembership, GroupRoleEnum, User
 from ..schemas import GroupOut, GroupCreate, GroupJoin, GroupMemberOut, UserOut
 from ..auth import get_current_user
@@ -160,7 +161,7 @@ async def leave_group(
     membership = result.scalar_one_or_none()
     if not membership:
         raise HTTPException(status_code=404, detail="Not a member")
-    if membership.role == GroupRoleEnum.owner:
+    if enum_equals(membership.role, GroupRoleEnum.owner):
         raise HTTPException(status_code=400, detail="Owner cannot leave; delete the group instead")
 
     await db.delete(membership)

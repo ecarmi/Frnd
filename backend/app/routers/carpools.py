@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
+from ..enum_utils import enum_equals
 from ..models import Carpool, CarpoolPassenger, CarpoolStatusEnum, User
 from ..schemas import CarpoolOut, CarpoolCreate, CarpoolPassengerOut, UserOut
 from ..auth import get_current_user
@@ -108,7 +109,7 @@ async def request_seat(
     carpool = await _load_carpool(carpool_id, db)
     if not carpool:
         raise HTTPException(status_code=404, detail="Carpool not found")
-    if carpool.status != CarpoolStatusEnum.open:
+    if not enum_equals(carpool.status, CarpoolStatusEnum.open):
         raise HTTPException(status_code=400, detail="Carpool is not open")
     if carpool.driver_id == current_user.id:
         raise HTTPException(status_code=400, detail="Driver cannot request a seat")

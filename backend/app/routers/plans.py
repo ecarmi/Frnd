@@ -7,7 +7,10 @@ from sqlalchemy.orm import selectinload
 import json
 
 from ..database import get_db
-from ..models import User, Plan, PlanMember, PlanMemberStatusEnum, Message, Event
+from ..models import (
+    User, Plan, PlanMember, PlanMemberStatusEnum, PlanStatusEnum,
+    Message, MessageTypeEnum, Event,
+)
 from ..schemas import (
     PlanOut, CreatePlanBody, VoteBody, MsgBody, PlanStatusBody, InviteBody,
     MessageOut, UserOut, EventOut
@@ -97,7 +100,7 @@ async def create_plan(
         creator_id=current_user.id,
         title=body.title,
         event_ids=body.event_ids,
-        status="voting" if len(body.event_ids) > 1 else "proposal",
+        status=PlanStatusEnum.voting if len(body.event_ids) > 1 else PlanStatusEnum.proposal,
     ))
 
     # Add creator as going
@@ -111,7 +114,7 @@ async def create_plan(
     db.add(Message(
         plan_id=plan_id, user_id=current_user.id,
         body=f"{current_user.name} created this plan",
-        type="system"
+        type=MessageTypeEnum.system,
     ))
 
     await db.commit()
@@ -188,7 +191,7 @@ async def invite_to_plan(
         db.add(Message(
             plan_id=plan.id, user_id=current_user.id,
             body=f"{current_user.name} invited {added_count} person{'s' if added_count > 1 else ''}",
-            type="system"
+            type=MessageTypeEnum.system,
         ))
         await db.commit()
 
@@ -225,12 +228,12 @@ async def vote(
 
     # Simple: first event to reach majority wins
     plan.selected_event_id = body.event_id
-    plan.status = "locked"
+    plan.status = PlanStatusEnum.locked
 
     db.add(Message(
         plan_id=plan.id, user_id=current_user.id,
         body=f"{current_user.name} voted to lock in an event",
-        type="system"
+        type=MessageTypeEnum.system,
     ))
 
     await db.commit()
@@ -258,7 +261,7 @@ async def send_message(
         plan_id=plan_id,
         user_id=current_user.id,
         body=body.body,
-        type="text",
+        type=MessageTypeEnum.text,
     )
     db.add(msg)
     await db.commit()
@@ -335,7 +338,7 @@ async def join_plan_by_code(
     db.add(Message(
         plan_id=plan.id, user_id=current_user.id,
         body=f"{current_user.name} joined via invite link",
-        type="system"
+        type=MessageTypeEnum.system,
     ))
     await db.commit()
 
