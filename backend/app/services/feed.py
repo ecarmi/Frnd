@@ -55,39 +55,6 @@ def temporal_score(start_time: datetime) -> float:
     return 0.05              # Far future
 
 
-# ---------------------------------------------------------------------------
-# Social score
-# ---------------------------------------------------------------------------
-
-async def social_score(
-    event: Event,
-    user: User,
-    friend_ids: set[str],
-    db: AsyncSession,
-) -> tuple[float, list[User], list[User]]:
-    """Returns (score 0-1, friends_going, friends_interested)."""
-    result = await db.execute(
-        select(RSVP).where(
-            RSVP.event_id == event.id,
-            RSVP.user_id.in_(friend_ids),
-        )
-    )
-    friend_rsvps = result.scalars().all()
-
-    going = []
-    interested = []
-    for rsvp in friend_rsvps:
-        u_result = await db.execute(select(User).where(User.id == rsvp.user_id).options(selectinload(User.taste_profile)))
-        u = u_result.scalar_one_or_none()
-        if not u:
-            continue
-        if rsvp.status == RSVPStatusEnum.going:
-            going.append(u)
-        elif rsvp.status == RSVPStatusEnum.interested:
-            interested.append(u)
-
-    score = min(1.0, (len(going) * 1.0 + len(interested) * 0.5) / 5.0)
-    return score, going, interested
 
 
 # ---------------------------------------------------------------------------
@@ -105,23 +72,22 @@ async def get_feed(
 ) -> tuple[list[EventOut], Optional[str]]:
     """Returns ranked list of EventOut and optional next_cursor."""
 
-    # Fetch friend IDs
+    # 1. Friend IDs — single query
     f_result = await db.execute(
         select(Friendship).where(
             or_(Friendship.user_a_id == user.id, Friendship.user_b_id == user.id)
         )
     )
-    friend_ids = set()
+    friend_ids: set[str] = set()
     for f in f_result.scalars().all():
         other = f.user_b_id if f.user_a_id == user.id else f.user_a_id
         friend_ids.add(other)
 
-    # Fetch upcoming events (rough radius filter via bounding box)
-    # 1 degree latitude ≈ 111 km
+    # 2. Candidate events — single query with bounding box
     lat_delta = radius_km / 111.0
     lng_delta = radius_km / (111.0 * math.cos(math.radians(lat)))
-
     now = datetime.now(timezone.utc)
+
     events_result = await db.execute(
         select(Event)
         .options(selectinload(Event.venue))
@@ -136,58 +102,65 @@ async def get_feed(
     events = events_result.scalars().all()
 
     if not events:
-        # Fall through: return all upcoming events (dev/empty-DB scenario)
         all_result = await db.execute(
             select(Event).options(selectinload(Event.venue)).where(Event.start_time >= now).limit(50)
         )
         events = all_result.scalars().all()
 
-    user_vector = user.taste_vector or []
+    if not events:
+        return [], None
 
-    # Score each event
-    scored = []
-    for event in events:
-        ev_vector = event.attribute_vector or []
+    event_ids = [e.id for e in events]
 
-        t_score   = temporal_score(event.start_time)
-        soc_score, going, interested = await social_score(event, user, friend_ids, db)
-
-        if user_vector and ev_vector:
-            t_sim = cosine_similarity(user_vector, ev_vector)
-        else:
-            t_sim = 0.0
-
-        final = (
-            0.40 * t_sim +
-            0.35 * soc_score +
-            0.15 * t_score +
-            0.10 * min(1.0, event.trending_score)
+    # 3. All friend RSVPs across all candidate events — single batched query
+    friend_rsvps_result = await db.execute(
+        select(RSVP).where(
+            RSVP.event_id.in_(event_ids),
+            RSVP.user_id.in_(friend_ids),
         )
-        scored.append((final, event, going, interested))
+    ) if friend_ids else None
 
-    scored.sort(key=lambda x: x[0], reverse=True)
+    friend_rsvps = friend_rsvps_result.scalars().all() if friend_rsvps_result else []
 
-    # Diversity injection — every 6th card replace with non-top category
-    result_events = []
-    for i, (score, event, going, interested) in enumerate(scored[:limit]):
-        result_events.append((score, event, going, interested))
+    # 4. Load the friend users referenced by those RSVPs — single batched query
+    friend_user_ids = {r.user_id for r in friend_rsvps}
+    friend_users: dict[str, User] = {}
+    if friend_user_ids:
+        users_result = await db.execute(
+            select(User)
+            .options(selectinload(User.taste_profile))
+            .where(User.id.in_(friend_user_ids))
+        )
+        for u in users_result.scalars().all():
+            friend_users[u.id] = u
 
-    # Fetch saved events for current user
+    # 5. Build per-event social data from batched results
+    going_map: dict[str, list[User]] = {eid: [] for eid in event_ids}
+    interested_map: dict[str, list[User]] = {eid: [] for eid in event_ids}
+    for rsvp in friend_rsvps:
+        u = friend_users.get(rsvp.user_id)
+        if not u:
+            continue
+        if rsvp.status == RSVPStatusEnum.going:
+            going_map[rsvp.event_id].append(u)
+        elif rsvp.status == RSVPStatusEnum.interested:
+            interested_map[rsvp.event_id].append(u)
+
+    # 6. User's own saved events and RSVPs — two queries (not per-event)
     saved_result = await db.execute(
         select(SavedEvent.event_id).where(SavedEvent.user_id == user.id)
     )
     saved_ids = {row[0] for row in saved_result.all()}
 
-    # Fetch user's own RSVPs
     rsvp_result = await db.execute(
         select(RSVP).where(RSVP.user_id == user.id)
     )
     user_rsvps = {r.event_id: r.status for r in rsvp_result.scalars().all()}
 
-    # Count total interested per event
+    # 7. Total interested counts — single batched query
     total_result = await db.execute(
         select(RSVP.event_id, RSVP.user_id).where(
-            RSVP.event_id.in_([e.id for _, e, _, _ in result_events]),
+            RSVP.event_id.in_(event_ids),
             RSVP.status.in_([RSVPStatusEnum.going, RSVPStatusEnum.interested]),
         )
     )
@@ -195,10 +168,34 @@ async def get_feed(
     for event_id, _ in total_result.all():
         total_map[event_id] = total_map.get(event_id, 0) + 1
 
+    # 8. Score and rank
+    user_vector = user.taste_vector or []
+    scored = []
+    for event in events:
+        going = going_map.get(event.id, [])
+        interested = interested_map.get(event.id, [])
+        n_going, n_interested = len(going), len(interested)
+
+        t_score = temporal_score(event.start_time)
+        soc_score = min(1.0, (n_going * 1.0 + n_interested * 0.5) / 5.0)
+        ev_vector = event.attribute_vector or []
+        t_sim = cosine_similarity(user_vector, ev_vector) if user_vector and ev_vector else 0.0
+
+        final = (
+            0.40 * t_sim +
+            0.35 * soc_score +
+            0.15 * t_score +
+            0.10 * min(1.0, event.trending_score or 0.0)
+        )
+        scored.append((final, event, going, interested))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    # 9. Build output
     out = []
-    for i, (score, event, going, interested) in enumerate(result_events):
+    for _, event, going, interested in scored[:limit]:
         ai_reason = _ai_reason(event, going, user)
-        event_out = EventOut(
+        out.append(EventOut(
             id=event.id,
             title=event.title,
             description=event.description,
@@ -212,18 +209,16 @@ async def get_feed(
             tags=event.tags or [],
             image_url=event.image_url,
             source=event.source,
-            trending_score=event.trending_score,
+            trending_score=event.trending_score or 0.0,
             friends_going=[UserOut.model_validate(u) for u in going],
             friends_interested=[UserOut.model_validate(u) for u in interested],
             total_interested=total_map.get(event.id, 0),
             user_rsvp_status=user_rsvps.get(event.id),
             ai_reason_chip=ai_reason,
             is_saved=event.id in saved_ids,
-        )
-        out.append(event_out)
+        ))
 
-    next_cursor = None  # Implement keyset pagination if needed
-    return out, next_cursor
+    return out, None
 
 
 def _ai_reason(event: Event, friends_going: list[User], user: User) -> str:
@@ -251,26 +246,29 @@ async def build_feed_event_out(
     user: User,
     db: AsyncSession,
 ) -> EventOut:
+    # Batch: fetch saved + user RSVP + total interested in parallel via a single combined query
+    rows = await db.execute(
+        select(RSVP.event_id, RSVP.user_id, RSVP.status).where(
+            RSVP.event_id == event.id,
+        )
+    )
+    all_rsvps = rows.all()
+
+    my_rsvp_status = None
+    total = 0
+    for _, uid, status in all_rsvps:
+        if uid == user.id:
+            my_rsvp_status = status
+        if status in (RSVPStatusEnum.going, RSVPStatusEnum.interested):
+            total += 1
+
     saved_result = await db.execute(
-        select(SavedEvent).where(
+        select(SavedEvent.event_id).where(
             SavedEvent.user_id == user.id,
             SavedEvent.event_id == event.id,
         )
     )
     is_saved = saved_result.scalar_one_or_none() is not None
-
-    rsvp_result = await db.execute(
-        select(RSVP).where(RSVP.user_id == user.id, RSVP.event_id == event.id)
-    )
-    my_rsvp = rsvp_result.scalar_one_or_none()
-
-    total_result = await db.execute(
-        select(RSVP).where(
-            RSVP.event_id == event.id,
-            RSVP.status.in_([RSVPStatusEnum.going, RSVPStatusEnum.interested]),
-        )
-    )
-    total = len(total_result.scalars().all())
 
     return EventOut(
         id=event.id,
@@ -289,6 +287,6 @@ async def build_feed_event_out(
         creator_id=event.creator_id,
         trending_score=event.trending_score or 0.0,
         total_interested=total,
-        user_rsvp_status=my_rsvp.status if my_rsvp else None,
+        user_rsvp_status=my_rsvp_status,
         is_saved=is_saved,
     )
