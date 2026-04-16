@@ -260,13 +260,13 @@ async def build_feed_event_out(
 
     my_rsvp_status = None
     total = 0
-    friend_status_by_id: dict[str, str] = {}
+    attendee_status_by_id: dict[str, str] = {}
     for _, uid, status in all_rsvps:
         if uid == user.id:
             my_rsvp_status = status
         if enum_equals(status, RSVPStatusEnum.going) or enum_equals(status, RSVPStatusEnum.interested):
             total += 1
-            friend_status_by_id[uid] = status
+            attendee_status_by_id[uid] = status
 
     saved_result = await db.execute(
         select(SavedEvent.event_id).where(
@@ -284,7 +284,7 @@ async def build_feed_event_out(
     friend_ids: set[str] = set()
     for friendship in friendships_result.scalars().all():
         other_id = friendship.user_b_id if friendship.user_a_id == user.id else friendship.user_a_id
-        if other_id in friend_status_by_id:
+        if other_id in attendee_status_by_id:
             friend_ids.add(other_id)
 
     friend_users: dict[str, User] = {}
@@ -299,7 +299,7 @@ async def build_feed_event_out(
 
     friends_going_models: list[User] = []
     friends_interested_models: list[User] = []
-    for uid, status in friend_status_by_id.items():
+    for uid, status in attendee_status_by_id.items():
         friend = friend_users.get(uid)
         if not friend:
             continue
@@ -307,6 +307,20 @@ async def build_feed_event_out(
             friends_going_models.append(friend)
         elif enum_equals(status, RSVPStatusEnum.interested):
             friends_interested_models.append(friend)
+
+    if not friends_going_models:
+        attendee_user_ids = [
+            uid for uid, status in attendee_status_by_id.items()
+            if uid != user.id and enum_equals(status, RSVPStatusEnum.going)
+        ][:8]
+        if attendee_user_ids:
+            attendee_users_result = await db.execute(
+                select(User)
+                .options(selectinload(User.taste_profile))
+                .where(User.id.in_(attendee_user_ids))
+            )
+            attendee_users = {attendee.id: attendee for attendee in attendee_users_result.scalars().all()}
+            friends_going_models = [attendee_users[uid] for uid in attendee_user_ids if uid in attendee_users]
 
     friends_going = [UserOut.model_validate(friend) for friend in friends_going_models]
     friends_interested = [UserOut.model_validate(friend) for friend in friends_interested_models]

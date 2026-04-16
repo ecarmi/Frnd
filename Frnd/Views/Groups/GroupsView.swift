@@ -21,19 +21,45 @@ final class GroupsViewModel: ObservableObject {
 
     func createGroup(name: String, description: String, isPrivate: Bool) async throws {
         let group = try await APIService.shared.createGroup(name: name, description: description, isPrivate: isPrivate)
-        groups.insert(group, at: 0)
+        upsert(group)
     }
 
     func joinGroup(inviteCode: String) async throws {
         let group = try await APIService.shared.joinGroup(inviteCode: inviteCode)
-        if !groups.contains(where: { $0.id == group.id }) {
-            groups.insert(group, at: 0)
-        }
+        upsert(group)
+    }
+
+    func joinPublicGroup(id: String) async throws -> Group {
+        let group = try await APIService.shared.joinPublicGroup(id: id)
+        upsert(group)
+        return group
+    }
+
+    func updateGroup(id: String, name: String, description: String) async throws -> Group {
+        let group = try await APIService.shared.updateGroup(id: id, name: name, description: description)
+        upsert(group)
+        return group
+    }
+
+    func updateGroupMemberRole(groupId: String, userId: String, role: GroupRole) async throws -> Group {
+        let group = try await APIService.shared.updateGroupMemberRole(groupId: groupId, userId: userId, role: role)
+        upsert(group)
+        return group
     }
 
     func leaveGroup(id: String) async throws {
         try await APIService.shared.leaveGroup(id: id)
         groups.removeAll { $0.id == id }
+    }
+
+    func deleteGroup(id: String) async throws {
+        try await APIService.shared.deleteGroup(id: id)
+        groups.removeAll { $0.id == id }
+    }
+
+    func upsert(_ group: Group) {
+        groups.removeAll { $0.id == group.id }
+        groups.insert(group, at: 0)
     }
 }
 
@@ -181,18 +207,46 @@ struct GroupRowView: View {
 // MARK: - Group Detail
 
 struct GroupDetailView: View {
-    let group: Group
+    @State private var group: Group
     @ObservedObject var viewModel: GroupsViewModel
     @State private var activities: [ActivityPost] = []
     @State private var loadingActivities = false
     @State private var showCreateActivity = false
     @State private var showCreateEvent = false
+    @State private var showEditGroup = false
+    @State private var isJoiningPublicGroup = false
+    @State private var actionError: String?
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppState
 
+    init(group: Group, viewModel: GroupsViewModel) {
+        _group = State(initialValue: group)
+        self.viewModel = viewModel
+    }
+
+    private var currentUserId: String? {
+        appState.currentUser?.id
+    }
+
+    private var currentMembership: GroupMember? {
+        guard let currentUserId else { return nil }
+        return group.members.first { $0.userId == currentUserId }
+    }
+
+    private var currentRole: GroupRole? {
+        currentMembership?.role
+    }
+
     private var isMember: Bool {
-        guard let currentUserId = appState.currentUser?.id else { return false }
-        return group.members.contains { $0.userId == currentUserId }
+        currentMembership != nil
+    }
+
+    private var isOwner: Bool {
+        currentRole == .owner
+    }
+
+    private var canManageGroup: Bool {
+        currentRole == .owner || currentRole == .admin
     }
 
     var body: some View {
@@ -218,21 +272,49 @@ struct GroupDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Group Error", isPresented: Binding(
+            get: { actionError != nil },
+            set: { if !$0 { actionError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(actionError ?? "")
+        }
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text(group.name)
                     .font(.headingMedium)
                     .foregroundColor(.textPrimary)
             }
-            if isMember {
+            if canManageGroup || isMember {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button("Post Event") { showCreateEvent = true }
-                        Button("Post Activity") { showCreateActivity = true }
-                        Button("Leave Group", role: .destructive) {
-                            Task {
-                                try? await viewModel.leaveGroup(id: group.id)
-                                dismiss()
+                        if canManageGroup {
+                            Button("Edit Group") { showEditGroup = true }
+                            Button("Post Event") { showCreateEvent = true }
+                            Button("Post Activity") { showCreateActivity = true }
+                        }
+                        if isOwner {
+                            Button("Delete Group", role: .destructive) {
+                                Task {
+                                    do {
+                                        try await viewModel.deleteGroup(id: group.id)
+                                        dismiss()
+                                    } catch {
+                                        actionError = error.localizedDescription
+                                    }
+                                }
+                            }
+                        } else if isMember {
+                            Button("Leave Group", role: .destructive) {
+                                Task {
+                                    do {
+                                        try await viewModel.leaveGroup(id: group.id)
+                                        dismiss()
+                                    } catch {
+                                        actionError = error.localizedDescription
+                                    }
+                                }
                             }
                         }
                     } label: {
@@ -250,10 +332,16 @@ struct GroupDetailView: View {
                 activities.insert(post, at: 0)
             }
         }
+        .sheet(isPresented: $showEditGroup) {
+            EditGroupSheet(group: group, viewModel: viewModel) { updatedGroup in
+                applyGroupUpdate(updatedGroup)
+            }
+        }
         .task {
-            loadingActivities = true
-            activities = (try? await APIService.shared.fetchActivities(groupId: group.id)) ?? []
-            loadingActivities = false
+            if let refreshedGroup = try? await APIService.shared.fetchGroup(id: group.id) {
+                applyGroupUpdate(refreshedGroup)
+            }
+            await loadActivities()
         }
     }
 
@@ -281,6 +369,30 @@ struct GroupDetailView: View {
                 Text(group.description)
                     .font(.bodyMedium)
                     .foregroundColor(.textSecondary)
+            }
+            if !group.isPrivate && !isMember {
+                Button {
+                    Task {
+                        isJoiningPublicGroup = true
+                        defer { isJoiningPublicGroup = false }
+                        do {
+                            let joined = try await viewModel.joinPublicGroup(id: group.id)
+                            applyGroupUpdate(joined)
+                            await loadActivities()
+                        } catch {
+                            actionError = error.localizedDescription
+                        }
+                    }
+                } label: {
+                    if isJoiningPublicGroup {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text("Join Group")
+                    }
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(isJoiningPublicGroup)
+                .padding(.top, Spacing.sm)
             }
         }
     }
@@ -341,6 +453,27 @@ struct GroupDetailView: View {
                                 .foregroundColor(.textTertiary)
                         }
                         Spacer()
+                        if isOwner, let currentUserId, member.userId != currentUserId {
+                            Menu {
+                                if member.role == .member {
+                                    Button("Make Admin") {
+                                        Task { await updateMemberRole(member, to: .admin) }
+                                    }
+                                }
+                                if member.role == .admin {
+                                    Button("Remove Admin") {
+                                        Task { await updateMemberRole(member, to: .member) }
+                                    }
+                                }
+                                Button("Make Owner") {
+                                    Task { await updateMemberRole(member, to: .owner) }
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .foregroundColor(.textTertiary)
+                                    .frame(width: 28, height: 28)
+                            }
+                        }
                     }
                 }
             }
@@ -356,7 +489,7 @@ struct GroupDetailView: View {
                     .textCase(.uppercase)
                     .tracking(2)
                 Spacer()
-                if isMember {
+                if canManageGroup {
                     Button("Post") { showCreateActivity = true }
                         .font(.captionMedium)
                         .foregroundColor(.ember)
@@ -372,12 +505,123 @@ struct GroupDetailView: View {
             } else {
                 LazyVStack(spacing: Spacing.sm) {
                     ForEach(activities) { post in
-                        ActivityPostCard(post: post) { updated in
-                            if let idx = activities.firstIndex(where: { $0.id == updated.id }) {
-                                activities[idx] = updated
+                        ActivityPostCard(
+                            post: post,
+                            onUpdate: { updated in
+                                if let idx = activities.firstIndex(where: { $0.id == updated.id }) {
+                                    activities[idx] = updated
+                                }
+                            },
+                            onDelete: { deletedId in
+                                activities.removeAll { $0.id == deletedId }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func loadActivities() async {
+        loadingActivities = true
+        activities = (try? await APIService.shared.fetchActivities(groupId: group.id)) ?? []
+        loadingActivities = false
+    }
+
+    private func applyGroupUpdate(_ updatedGroup: Group) {
+        group = updatedGroup
+        if let currentUserId, updatedGroup.members.contains(where: { $0.userId == currentUserId }) {
+            viewModel.upsert(updatedGroup)
+        } else {
+            viewModel.groups.removeAll { $0.id == updatedGroup.id }
+        }
+    }
+
+    private func updateMemberRole(_ member: GroupMember, to role: GroupRole) async {
+        do {
+            let updated = try await viewModel.updateGroupMemberRole(groupId: group.id, userId: member.userId, role: role)
+            applyGroupUpdate(updated)
+        } catch {
+            actionError = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - Edit Group Sheet
+
+struct EditGroupSheet: View {
+    let group: Group
+    @ObservedObject var viewModel: GroupsViewModel
+    let onSaved: (Group) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var description: String
+    @State private var isLoading = false
+    @State private var error: String?
+
+    init(group: Group, viewModel: GroupsViewModel, onSaved: @escaping (Group) -> Void) {
+        self.group = group
+        self.viewModel = viewModel
+        self.onSaved = onSaved
+        _name = State(initialValue: group.name)
+        _description = State(initialValue: group.description)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.bgPrimary.ignoresSafeArea()
+                Form {
+                    Section("Group Info") {
+                        TextField("Name", text: $name)
+                            .foregroundColor(.textPrimary)
+                        TextField("Description", text: $description, axis: .vertical)
+                            .foregroundColor(.textPrimary)
+                            .lineLimit(3...6)
+                    }
+                    if let error {
+                        Section {
+                            Text(error).foregroundColor(.rose)
+                        }
+                    }
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle("Edit Group")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(.textSecondary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") {
+                        Task {
+                            error = nil
+                            let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !trimmedName.isEmpty else {
+                                error = "Name is required"
+                                return
+                            }
+
+                            isLoading = true
+                            defer { isLoading = false }
+                            do {
+                                let updated = try await viewModel.updateGroup(
+                                    id: group.id,
+                                    name: trimmedName,
+                                    description: description.trimmingCharacters(in: .whitespacesAndNewlines)
+                                )
+                                onSaved(updated)
+                                dismiss()
+                            } catch {
+                                self.error = error.localizedDescription
                             }
                         }
                     }
+                    .foregroundColor(.ember)
+                    .disabled(isLoading)
                 }
             }
         }

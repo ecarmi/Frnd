@@ -11,7 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
-from ..models import User, Event, Venue, RSVP, RSVPStatusEnum, SavedEvent
+from ..models import (
+    User, Event, Venue, RSVP, RSVPStatusEnum, SavedEvent,
+    Group, GroupMembership, GroupRoleEnum,
+)
 from ..schemas import EventOut, EventCreate, RSVPOut, RSVPBody, FeedResponse
 from ..auth import get_current_user
 from ..services.feed import build_feed_event_out
@@ -84,6 +87,20 @@ async def create_event(
         raise HTTPException(status_code=400, detail="Provide either venue_id or venue details")
 
     try:
+        if body.group_id:
+            group_result = await db.execute(
+                select(Group)
+                .options(selectinload(Group.members))
+                .where(Group.id == body.group_id)
+            )
+            group = group_result.scalar_one_or_none()
+            if not group:
+                raise HTTPException(status_code=404, detail="Group not found")
+
+            membership = next((m for m in group.members if m.user_id == current_user.id), None)
+            if not membership or membership.role not in {GroupRoleEnum.owner, GroupRoleEnum.admin}:
+                raise HTTPException(status_code=403, detail="Only group owners or admins can create group events")
+
         if body.venue_id:
             venue_result = await db.execute(select(Venue).where(Venue.id == body.venue_id))
             if not venue_result.scalar_one_or_none():

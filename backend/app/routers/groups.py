@@ -8,8 +8,11 @@ from sqlalchemy.orm import selectinload
 
 from ..database import get_db
 from ..enum_utils import enum_equals
-from ..models import Group, GroupMembership, GroupRoleEnum, User
-from ..schemas import GroupOut, GroupCreate, GroupJoin, GroupMemberOut, UserOut
+from ..models import Group, GroupMembership, GroupRoleEnum, User, Event, ActivityPost
+from ..schemas import (
+    GroupOut, GroupCreate, GroupJoin, GroupUpdate, GroupMemberRoleUpdate,
+    GroupMemberOut, UserOut,
+)
 from ..auth import get_current_user
 
 router = APIRouter(prefix="/groups", tags=["groups"])
@@ -49,6 +52,20 @@ def _group_out(group: Group) -> GroupOut:
         members=members,
         member_count=len(members),
     )
+
+
+def _membership_for_user(group: Group, user_id: str) -> GroupMembership | None:
+    for membership in group.members:
+        if membership.user_id == user_id:
+            return membership
+    return None
+
+
+def _require_group_role(group: Group, user_id: str, allowed_roles: set[GroupRoleEnum]) -> GroupMembership:
+    membership = _membership_for_user(group, user_id)
+    if not membership or membership.role not in allowed_roles:
+        raise HTTPException(status_code=403, detail="Insufficient group permissions")
+    return membership
 
 
 @router.get("", response_model=list[GroupOut])
@@ -146,6 +163,86 @@ async def join_by_invite(
     return _group_out(group)
 
 
+@router.post("/{group_id}/join", response_model=GroupOut)
+async def join_public_group(
+    group_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    group = await _load_group(group_id, db)
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    if group.is_private:
+        raise HTTPException(status_code=400, detail="Private groups require an invite code")
+
+    if not _membership_for_user(group, current_user.id):
+        db.add(GroupMembership(group_id=group.id, user_id=current_user.id, role=GroupRoleEnum.member))
+        await db.commit()
+        group = await _load_group(group.id, db)
+
+    return _group_out(group)
+
+
+@router.patch("/{group_id}", response_model=GroupOut)
+async def update_group(
+    group_id: str,
+    body: GroupUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    group = await _load_group(group_id, db)
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    _require_group_role(group, current_user.id, {GroupRoleEnum.owner, GroupRoleEnum.admin})
+
+    if body.name is not None:
+        trimmed_name = body.name.strip()
+        if trimmed_name:
+            group.name = trimmed_name
+    if body.description is not None:
+        group.description = body.description.strip()
+
+    await db.commit()
+    group = await _load_group(group.id, db)
+    return _group_out(group)
+
+
+@router.patch("/{group_id}/members/{user_id}", response_model=GroupOut)
+async def update_group_member_role(
+    group_id: str,
+    user_id: str,
+    body: GroupMemberRoleUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    group = await _load_group(group_id, db)
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    owner_membership = _require_group_role(group, current_user.id, {GroupRoleEnum.owner})
+    target_membership = _membership_for_user(group, user_id)
+    if not target_membership:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    if body.role == GroupRoleEnum.owner:
+        if target_membership.user_id == current_user.id:
+            raise HTTPException(status_code=400, detail="You already own this group")
+        owner_membership.role = GroupRoleEnum.admin
+        target_membership.role = GroupRoleEnum.owner
+        group.creator_id = target_membership.user_id
+    else:
+        if target_membership.user_id == current_user.id:
+            raise HTTPException(status_code=400, detail="Use ownership transfer instead")
+        if enum_equals(target_membership.role, GroupRoleEnum.owner):
+            raise HTTPException(status_code=400, detail="Transfer ownership before changing the owner role")
+        target_membership.role = body.role
+
+    await db.commit()
+    group = await _load_group(group.id, db)
+    return _group_out(group)
+
+
 @router.delete("/{group_id}/leave", status_code=204)
 async def leave_group(
     group_id: str,
@@ -165,4 +262,28 @@ async def leave_group(
         raise HTTPException(status_code=400, detail="Owner cannot leave; delete the group instead")
 
     await db.delete(membership)
+    await db.commit()
+
+
+@router.delete("/{group_id}", status_code=204)
+async def delete_group(
+    group_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    group = await _load_group(group_id, db)
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    _require_group_role(group, current_user.id, {GroupRoleEnum.owner})
+
+    events_result = await db.execute(select(Event).where(Event.group_id == group.id))
+    for event in events_result.scalars().all():
+        event.group_id = None
+
+    activities_result = await db.execute(select(ActivityPost).where(ActivityPost.group_id == group.id))
+    for activity in activities_result.scalars().all():
+        activity.group_id = None
+
+    await db.delete(group)
     await db.commit()

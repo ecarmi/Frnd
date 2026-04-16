@@ -147,6 +147,47 @@ final class APIService: ObservableObject {
         }
     }
 
+    private func requestVoid(
+        path: String,
+        method: String = "GET",
+        body: Encodable? = nil,
+        authenticated: Bool = true
+    ) async throws {
+        guard let url = URL(string: baseURL + path) else { throw APIError.invalidURL }
+
+        let isAuth = path.hasPrefix("/auth")
+        var req = URLRequest(url: url, timeoutInterval: isAuth ? 60 : 30)
+        req.httpMethod = method
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        if authenticated, let token = authToken {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        if let body = body {
+            req.httpBody = try encoder.encode(body)
+        }
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse else { throw APIError.unknown }
+
+            switch http.statusCode {
+            case 200...299:
+                return
+            case 401:
+                authToken = nil
+                throw APIError.unauthorized
+            default:
+                throw APIError.serverError(http.statusCode, "Request failed")
+            }
+        } catch let error as APIError {
+            throw error
+        } catch {
+            throw APIError.networkError(error)
+        }
+    }
+
     // MARK: - Auth
 
     func requestEmailOTP(email: String) async throws {
@@ -359,8 +400,7 @@ final class APIService: ObservableObject {
     }
 
     func deleteEvent(id: String) async throws {
-        struct Empty: Codable {}
-        let _: Empty = try await request(path: "/events/\(id)", method: "DELETE")
+        try await requestVoid(path: "/events/\(id)", method: "DELETE")
     }
 
     func completeOnboarding(vibeTagNames: [String]) async throws -> User {
@@ -402,6 +442,15 @@ final class APIService: ObservableObject {
         )
     }
 
+    func updateGroup(id: String, name: String, description: String) async throws -> Group {
+        struct Body: Encodable { let name: String; let description: String }
+        return try await request(
+            path: "/groups/\(id)",
+            method: "PATCH",
+            body: Body(name: name, description: description)
+        )
+    }
+
     func joinGroup(inviteCode: String) async throws -> Group {
         struct Body: Encodable { let invite_code: String }
         let normalized = normalizedInviteCode(from: inviteCode)
@@ -412,9 +461,25 @@ final class APIService: ObservableObject {
         )
     }
 
+    func joinPublicGroup(id: String) async throws -> Group {
+        try await request(path: "/groups/\(id)/join", method: "POST")
+    }
+
+    func updateGroupMemberRole(groupId: String, userId: String, role: GroupRole) async throws -> Group {
+        struct Body: Encodable { let role: GroupRole }
+        return try await request(
+            path: "/groups/\(groupId)/members/\(userId)",
+            method: "PATCH",
+            body: Body(role: role)
+        )
+    }
+
     func leaveGroup(id: String) async throws {
-        struct Empty: Codable {}
-        let _: Empty = try await request(path: "/groups/\(id)/leave", method: "DELETE")
+        try await requestVoid(path: "/groups/\(id)/leave", method: "DELETE")
+    }
+
+    func deleteGroup(id: String) async throws {
+        try await requestVoid(path: "/groups/\(id)", method: "DELETE")
     }
 
     private func normalizedInviteCode(from rawValue: String) -> String {
@@ -485,18 +550,50 @@ final class APIService: ObservableObject {
         )
     }
 
+    func updateActivity(
+        id: String,
+        title: String,
+        description: String,
+        activityType: ActivityType,
+        location: String?,
+        latitude: Double?,
+        longitude: Double?,
+        scheduledTime: Date?,
+        maxParticipants: Int?,
+        groupId: String?
+    ) async throws -> ActivityPost {
+        struct Body: Encodable {
+            let title: String
+            let description: String
+            let activity_type: ActivityType
+            let location: String?
+            let latitude: Double?
+            let longitude: Double?
+            let scheduled_time: Date?
+            let max_participants: Int?
+            let group_id: String?
+        }
+        return try await request(
+            path: "/activities/\(id)",
+            method: "PATCH",
+            body: Body(
+                title: title, description: description, activity_type: activityType,
+                location: location, latitude: latitude, longitude: longitude,
+                scheduled_time: scheduledTime, max_participants: maxParticipants, group_id: groupId
+            )
+        )
+    }
+
     func joinActivity(id: String) async throws -> ActivityPost {
         try await request(path: "/activities/\(id)/join", method: "POST")
     }
 
     func leaveActivity(id: String) async throws {
-        struct Empty: Codable {}
-        let _: Empty = try await request(path: "/activities/\(id)/leave", method: "DELETE")
+        try await requestVoid(path: "/activities/\(id)/leave", method: "DELETE")
     }
 
     func deleteActivity(id: String) async throws {
-        struct Empty: Codable {}
-        let _: Empty = try await request(path: "/activities/\(id)", method: "DELETE")
+        try await requestVoid(path: "/activities/\(id)", method: "DELETE")
     }
 
     // MARK: - Carpools
@@ -543,8 +640,7 @@ final class APIService: ObservableObject {
     }
 
     func leaveCarpool(carpoolId: String) async throws {
-        struct Empty: Codable {}
-        let _: Empty = try await request(path: "/carpools/\(carpoolId)/leave", method: "DELETE")
+        try await requestVoid(path: "/carpools/\(carpoolId)/leave", method: "DELETE")
     }
 }
 

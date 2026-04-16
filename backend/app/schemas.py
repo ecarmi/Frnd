@@ -286,6 +286,15 @@ class GroupJoin(BaseModel):
     invite_code: str
 
 
+class GroupUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class GroupMemberRoleUpdate(BaseModel):
+    role: GroupRoleEnum
+
+
 # ---------------------------------------------------------------------------
 # Activity Posts
 # ---------------------------------------------------------------------------
@@ -322,6 +331,18 @@ class ActivityPostCreate(BaseModel):
     title: str
     description: str = ""
     activity_type: ActivityTypeEnum = ActivityTypeEnum.social
+    location: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    scheduled_time: Optional[datetime] = None
+    max_participants: Optional[int] = None
+    group_id: Optional[str] = None
+
+
+class ActivityPostUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    activity_type: Optional[ActivityTypeEnum] = None
     location: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None

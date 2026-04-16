@@ -7,8 +7,14 @@ from sqlalchemy.orm import selectinload
 
 from ..database import get_db
 from ..enum_utils import enum_equals
-from ..models import ActivityPost, ActivityParticipant, ActivityStatusEnum, User
-from ..schemas import ActivityPostOut, ActivityPostCreate, ActivityParticipantOut, UserOut
+from ..models import (
+    ActivityPost, ActivityParticipant, ActivityStatusEnum, User,
+    Group, GroupMembership, GroupRoleEnum,
+)
+from ..schemas import (
+    ActivityPostOut, ActivityPostCreate, ActivityPostUpdate,
+    ActivityParticipantOut, UserOut,
+)
 from ..auth import get_current_user
 
 router = APIRouter(prefix="/activities", tags=["activities"])
@@ -60,12 +66,47 @@ async def _load_post(post_id: str, db: AsyncSession) -> ActivityPost | None:
     return result.scalar_one_or_none()
 
 
+async def _load_group(group_id: str, db: AsyncSession) -> Group | None:
+    result = await db.execute(
+        select(Group)
+        .options(selectinload(Group.members))
+        .where(Group.id == group_id)
+    )
+    return result.scalar_one_or_none()
+
+
+def _group_membership(group: Group, user_id: str) -> GroupMembership | None:
+    for membership in group.members:
+        if membership.user_id == user_id:
+            return membership
+    return None
+
+
+async def _ensure_group_admin(group_id: str, user_id: str, db: AsyncSession) -> Group:
+    group = await _load_group(group_id, db)
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    membership = _group_membership(group, user_id)
+    if not membership or membership.role not in {GroupRoleEnum.owner, GroupRoleEnum.admin}:
+        raise HTTPException(status_code=403, detail="Only group owners or admins can post to this group")
+
+    return group
+
+
 @router.get("", response_model=list[ActivityPostOut])
 async def list_activities(
     group_id: str | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if group_id:
+        group = await _load_group(group_id, db)
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+        if group.is_private and not _group_membership(group, current_user.id):
+            raise HTTPException(status_code=403, detail="Private group")
+
     q = (
         select(ActivityPost)
         .options(
@@ -92,6 +133,9 @@ async def create_activity(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if body.group_id:
+        await _ensure_group_admin(body.group_id, current_user.id, db)
+
     post_id = str(uuid.uuid4())
     db.add(ActivityPost(
         id=post_id,
@@ -113,6 +157,49 @@ async def create_activity(
 
     loaded = await _load_post(post_id, db)
     return _post_out(loaded, current_user.id)
+
+
+@router.patch("/{post_id}", response_model=ActivityPostOut)
+async def update_activity(
+    post_id: str,
+    body: ActivityPostUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    post = await _load_post(post_id, db)
+    if not post:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    if post.creator_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the creator can edit this activity")
+
+    target_group_id = body.group_id if body.group_id is not None else post.group_id
+    if target_group_id:
+        await _ensure_group_admin(target_group_id, current_user.id, db)
+
+    if body.title is not None:
+        trimmed_title = body.title.strip()
+        if trimmed_title:
+            post.title = trimmed_title
+    if body.description is not None:
+        post.description = body.description.strip()
+    if body.activity_type is not None:
+        post.activity_type = body.activity_type
+    if body.location is not None:
+        post.location = body.location.strip() or None
+    if body.latitude is not None:
+        post.latitude = body.latitude
+    if body.longitude is not None:
+        post.longitude = body.longitude
+    if body.scheduled_time is not None:
+        post.scheduled_time = body.scheduled_time
+    if body.max_participants is not None:
+        post.max_participants = body.max_participants
+    if body.group_id is not None:
+        post.group_id = body.group_id
+
+    await db.commit()
+    post = await _load_post(post.id, db)
+    return _post_out(post, current_user.id)
 
 
 @router.get("/{post_id}", response_model=ActivityPostOut)

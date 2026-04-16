@@ -71,10 +71,10 @@ struct PlanDetailView: View {
                 }
             }
             .task {
-                async let freshPlan = try? APIService.shared.fetchPlan(id: plan.id)
-                async let freshCarpools = try? APIService.shared.fetchCarpools(planId: plan.id)
-                if let p = await freshPlan { plan = p }
-                carpools = (await freshCarpools) ?? []
+                await refreshPlanState()
+            }
+            .task(id: plan.id) {
+                await runLiveRefreshLoop()
             }
         }
         
@@ -333,6 +333,7 @@ struct PlanDetailView: View {
                 defer { isSending = false }
                 if let msg = try? await APIService.shared.sendMessage(planId: plan.id, body: text) {
                     plan.messages.append(msg)
+                    await refreshPlanState()
                 } else {
                     // Optimistic
                     let msg = Message(
@@ -342,6 +343,20 @@ struct PlanDetailView: View {
                     )
                     plan.messages.append(msg)
                 }
+            }
+        }
+
+        private func refreshPlanState() async {
+            async let freshPlan = try? APIService.shared.fetchPlan(id: plan.id)
+            async let freshCarpools = try? APIService.shared.fetchCarpools(planId: plan.id)
+            if let p = await freshPlan { plan = p }
+            carpools = (await freshCarpools) ?? carpools
+        }
+
+        private func runLiveRefreshLoop() async {
+            while !Task.isCancelled {
+                await refreshPlanState()
+                try? await Task.sleep(for: .seconds(2))
             }
         }
         

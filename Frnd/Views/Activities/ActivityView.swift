@@ -49,11 +49,17 @@ struct ActivityFeedView: View {
                     ScrollView(showsIndicators: false) {
                         LazyVStack(spacing: Spacing.base) {
                             ForEach(viewModel.posts) { post in
-                                ActivityPostCard(post: post) { updated in
-                                    if let idx = viewModel.posts.firstIndex(where: { $0.id == updated.id }) {
-                                        viewModel.posts[idx] = updated
+                                ActivityPostCard(
+                                    post: post,
+                                    onUpdate: { updated in
+                                        if let idx = viewModel.posts.firstIndex(where: { $0.id == updated.id }) {
+                                            viewModel.posts[idx] = updated
+                                        }
+                                    },
+                                    onDelete: { deletedId in
+                                        viewModel.posts.removeAll { $0.id == deletedId }
                                     }
-                                }
+                                )
                             }
                             Color.clear.frame(height: 88)
                         }
@@ -110,8 +116,15 @@ struct ActivityFeedView: View {
 struct ActivityPostCard: View {
     let post: ActivityPost
     let onUpdate: (ActivityPost) -> Void
+    var onDelete: ((String) -> Void)? = nil
 
+    @EnvironmentObject private var appState: AppState
     @State private var isLoading = false
+    @State private var showEdit = false
+
+    private var isCreator: Bool {
+        post.creatorId == appState.currentUser?.id
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.base) {
@@ -131,6 +144,27 @@ struct ActivityPostCard: View {
                 }
 
                 Spacer()
+
+                if isCreator {
+                    Menu {
+                        Button("Edit") { showEdit = true }
+                        Button("Delete", role: .destructive) {
+                            Task {
+                                isLoading = true
+                                defer { isLoading = false }
+                                do {
+                                    try await APIService.shared.deleteActivity(id: post.id)
+                                    onDelete?(post.id)
+                                } catch {}
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.textTertiary)
+                            .frame(width: 28, height: 28)
+                    }
+                }
 
                 // Type pill
                 Text("\(post.activityType.emoji) \(post.activityType.displayName)")
@@ -186,22 +220,28 @@ struct ActivityPostCard: View {
         }
         .padding(Spacing.base)
         .cardStyle()
+        .sheet(isPresented: $showEdit) {
+            CreateActivityView(existingPost: post) { updated in
+                onUpdate(updated)
+            }
+        }
     }
 
     private var joinButton: some View {
         Button {
             Task {
                 isLoading = true
+                defer { isLoading = false }
                 do {
                     if post.isJoined {
                         try await APIService.shared.leaveActivity(id: post.id)
-                        // Signal parent to reload (server has updated state)
+                        let updated = try await APIService.shared.fetchActivity(id: post.id)
+                        onUpdate(updated)
                     } else {
                         let updated = try await APIService.shared.joinActivity(id: post.id)
                         onUpdate(updated)
                     }
                 } catch {}
-                isLoading = false
             }
         } label: {
             if isLoading {
@@ -223,24 +263,52 @@ struct ActivityPostCard: View {
 // MARK: - Create Activity View
 
 struct CreateActivityView: View {
-    let groupId: String?
-    let onCreated: (ActivityPost) -> Void
+    let fixedGroupId: String?
+    let existingPost: ActivityPost?
+    let onSaved: (ActivityPost) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var title = ""
-    @State private var description = ""
-    @State private var activityType: ActivityType = .social
-    @State private var location = ""
-    @State private var scheduledTime = Date().addingTimeInterval(3600 * 2)
-    @State private var hasTime = false
-    @State private var maxParticipants = ""
+    @EnvironmentObject private var appState: AppState
+    @State private var title: String
+    @State private var description: String
+    @State private var activityType: ActivityType
+    @State private var location: String
+    @State private var scheduledTime: Date
+    @State private var hasTime: Bool
+    @State private var maxParticipants: String
     @State private var isLoading = false
     @State private var error: String?
     @State private var groups: [Group] = []
-    @State private var selectedGroupId: String? = nil
+    @State private var selectedGroupId: String?
 
-    // Resolved group: use injected groupId if provided, otherwise use picker selection
-    private var resolvedGroupId: String? { groupId ?? selectedGroupId }
+    init(
+        groupId: String? = nil,
+        existingPost: ActivityPost? = nil,
+        onCreated: @escaping (ActivityPost) -> Void
+    ) {
+        self.fixedGroupId = groupId
+        self.existingPost = existingPost
+        self.onSaved = onCreated
+        _title = State(initialValue: existingPost?.title ?? "")
+        _description = State(initialValue: existingPost?.description ?? "")
+        _activityType = State(initialValue: existingPost?.activityType ?? .social)
+        _location = State(initialValue: existingPost?.location ?? "")
+        _scheduledTime = State(initialValue: existingPost?.scheduledTime ?? Date().addingTimeInterval(3600 * 2))
+        _hasTime = State(initialValue: existingPost?.scheduledTime != nil)
+        _maxParticipants = State(initialValue: existingPost?.maxParticipants.map(String.init) ?? "")
+        _selectedGroupId = State(initialValue: existingPost?.groupId)
+    }
+
+    private var resolvedGroupId: String? { fixedGroupId ?? selectedGroupId }
+    private var canPickGroup: Bool { fixedGroupId == nil && !adminGroups.isEmpty }
+    private var adminGroups: [Group] {
+        guard let currentUserId = appState.currentUser?.id else { return [] }
+        return groups.filter { group in
+            group.members.contains {
+                $0.userId == currentUserId && ($0.role == .owner || $0.role == .admin)
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -282,11 +350,11 @@ struct CreateActivityView: View {
                     }
 
                     // Group picker — only shown when not launched from within a group
-                    if groupId == nil && !groups.isEmpty {
+                    if canPickGroup {
                         Section("Link to Group (optional)") {
                             Picker("Group", selection: $selectedGroupId) {
                                 Text("None").tag(String?.none)
-                                ForEach(groups) { group in
+                                ForEach(adminGroups) { group in
                                     Text(group.name).tag(Optional(group.id))
                                 }
                             }
@@ -301,14 +369,14 @@ struct CreateActivityView: View {
                 .scrollContentBackground(.hidden)
                 .task { groups = (try? await APIService.shared.fetchMyGroups()) ?? [] }
             }
-            .navigationTitle("New Activity")
+            .navigationTitle(existingPost == nil ? "New Activity" : "Edit Activity")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }.foregroundColor(.textSecondary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Post") {
+                    Button(existingPost == nil ? "Post" : "Save") {
                         Task {
                             error = nil
                             guard !title.trimmingCharacters(in: .whitespaces).isEmpty else {
@@ -316,25 +384,45 @@ struct CreateActivityView: View {
                                 return
                             }
                             isLoading = true
+                            defer { isLoading = false }
                             do {
                                 let maxP = Int(maxParticipants)
-                                let post = try await APIService.shared.createActivity(
-                                    title: title,
-                                    description: description,
-                                    activityType: activityType,
-                                    location: location.isEmpty ? nil : location,
-                                    latitude: nil,
-                                    longitude: nil,
-                                    scheduledTime: hasTime ? scheduledTime : nil,
-                                    maxParticipants: maxP,
-                                    groupId: resolvedGroupId
-                                )
-                                onCreated(post)
+                                let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                                let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
+                                let trimmedLocation = location.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                                let post: ActivityPost
+                                if let existingPost {
+                                    post = try await APIService.shared.updateActivity(
+                                        id: existingPost.id,
+                                        title: trimmedTitle,
+                                        description: trimmedDescription,
+                                        activityType: activityType,
+                                        location: trimmedLocation.isEmpty ? nil : trimmedLocation,
+                                        latitude: nil,
+                                        longitude: nil,
+                                        scheduledTime: hasTime ? scheduledTime : nil,
+                                        maxParticipants: maxP,
+                                        groupId: resolvedGroupId
+                                    )
+                                } else {
+                                    post = try await APIService.shared.createActivity(
+                                        title: trimmedTitle,
+                                        description: trimmedDescription,
+                                        activityType: activityType,
+                                        location: trimmedLocation.isEmpty ? nil : trimmedLocation,
+                                        latitude: nil,
+                                        longitude: nil,
+                                        scheduledTime: hasTime ? scheduledTime : nil,
+                                        maxParticipants: maxP,
+                                        groupId: resolvedGroupId
+                                    )
+                                }
+                                onSaved(post)
                                 dismiss()
                             } catch {
                                 self.error = error.localizedDescription
                             }
-                            isLoading = false
                         }
                     }
                     .foregroundColor(.ember)
