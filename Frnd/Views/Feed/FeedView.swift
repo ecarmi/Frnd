@@ -4,7 +4,15 @@ struct FeedView: View {
     @StateObject private var viewModel = FeedViewModel()
     @EnvironmentObject private var savedEventsStore: SavedEventsStore
     @State private var selectedFilter: TimeFilter = .all
+    @State private var selectedTab: FeedTab = .forYou
     @State private var showCreateEvent = false
+    @State private var selectedEvent: Event?
+
+    enum FeedTab: String, CaseIterable {
+        case forYou = "For You"
+        case bookmarked = "Bookmarked"
+        case going = "Going"
+    }
 
     enum TimeFilter: String, CaseIterable {
         case all     = "All"
@@ -38,6 +46,10 @@ struct FeedView: View {
 
     private var filteredEvents: [Event] {
         viewModel.events.filter { selectedFilter.matches($0.startTime) }
+    }
+
+    private var bookmarkedEvents: [Event] {
+        savedEventsStore.savedEvents
     }
 
     var body: some View {
@@ -75,8 +87,14 @@ struct FeedView: View {
                 viewModel.events.insert(newEvent, at: 0)
             }
         }
+        .sheet(item: $selectedEvent) { event in
+            EventDetailView(event: event)
+        }
         .task {
             await viewModel.loadFeed(refresh: true)
+            await viewModel.loadGoingEvents()
+            let fetchedSavedEvents = (try? await APIService.shared.fetchSavedEvents()) ?? savedEventsStore.savedEvents
+            savedEventsStore.replaceSavedEvents(fetchedSavedEvents)
             savedEventsStore.bootstrap(from: viewModel.events)
         }
     }
@@ -88,72 +106,104 @@ struct FeedView: View {
             LazyVStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: Spacing.md) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("For You")
+                        Text(selectedTab.rawValue)
                             .font(.custom("Georgia", size: 28))
                             .foregroundColor(.textPrimary)
 
-                        Text("Chicago · Hyde Park")
+                        Text(subtitleText)
                             .font(.captionMedium)
                             .foregroundColor(.textSecondary)
                     }
 
-                    HStack(spacing: Spacing.sm) {
-                        ForEach(TimeFilter.allCases, id: \.self) { filter in
-                            Button {
-                                withAnimation(.spring(response: 0.25)) {
-                                    selectedFilter = filter
-                                }
-                            } label: {
-                                Text(filter.rawValue)
-                                    .font(.captionSmall)
-                                    .foregroundColor(selectedFilter == filter ? .white : .textSecondary)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(selectedFilter == filter ? Color.ember : Color.bgRaised)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .strokeBorder(
-                                                selectedFilter == filter ? Color.clear : Color.bgBorder
-                                            )
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                        }
+                    contentTabs
 
-                        Spacer()
+                    if selectedTab == .forYou {
+                        HStack(spacing: Spacing.sm) {
+                            ForEach(TimeFilter.allCases, id: \.self) { filter in
+                                Button {
+                                    withAnimation(.spring(response: 0.25)) {
+                                        selectedFilter = filter
+                                    }
+                                } label: {
+                                    Text(filter.rawValue)
+                                        .font(.captionSmall)
+                                        .foregroundColor(selectedFilter == filter ? .white : .textSecondary)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(selectedFilter == filter ? Color.ember : Color.bgRaised)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .strokeBorder(
+                                                    selectedFilter == filter ? Color.clear : Color.bgBorder
+                                                )
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            Spacer()
+                        }
                     }
                 }
                 .padding(.horizontal, Spacing.base)
                 .padding(.top, Spacing.base)
                 .padding(.bottom, Spacing.md)
 
-                if filteredEvents.isEmpty && !viewModel.isLoading {
-                    emptyState
+                if let error = currentError {
+                    LoadErrorCard(
+                        title: selectedTab == .forYou ? "Could not load the feed" : "Could not load events",
+                        message: error,
+                        retry: {
+                            Task { await reloadSelectedTab() }
+                        }
+                    )
+                    .padding(.horizontal, Spacing.base)
+                    .padding(.bottom, Spacing.md)
+                }
+
+                if currentEvents.isEmpty && !isCurrentTabLoading {
+                    if currentError != nil {
+                        errorState
+                    } else {
+                        emptyState
+                    }
                 } else {
                     LazyVStack(spacing: Spacing.md) {
-                        ForEach(filteredEvents) { event in
-                            EventCardView(
-                                event: event,
-                                onSave: {
-                                    Task { try? await savedEventsStore.toggle(event: event) }
-                                },
-                                onRSVP: {
-                                    Task {
-                                        await viewModel.rsvp(
-                                            eventId: event.id,
-                                            status: event.userRSVPStatus == .going ? .interested : .going
-                                        )
+                        if selectedTab == .forYou {
+                            ForEach(filteredEvents) { event in
+                                EventCardView(
+                                    event: event,
+                                    onSave: {
+                                        Task { try? await savedEventsStore.toggle(event: event) }
+                                    },
+                                    onRSVP: {
+                                        Task {
+                                            await viewModel.rsvp(
+                                                eventId: event.id,
+                                                status: event.userRSVPStatus == .going ? .interested : .going
+                                            )
+                                        }
                                     }
+                                )
+                                .padding(.horizontal, Spacing.base)
+                                .task {
+                                    await viewModel.loadMoreIfNeeded(currentEvent: event)
                                 }
-                            )
-                            .padding(.horizontal, Spacing.base)
-                            .task {
-                                await viewModel.loadMoreIfNeeded(currentEvent: event)
+                            }
+                        } else {
+                            ForEach(currentEvents) { event in
+                                Button {
+                                    selectedEvent = event
+                                } label: {
+                                    SearchResultRow(event: event)
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.horizontal, Spacing.base)
                             }
                         }
 
-                        if viewModel.isLoadingMore {
+                        if selectedTab == .forYou, viewModel.isLoadingMore {
                             ProgressView()
                                 .tint(.ember)
                                 .padding(.vertical, 24)
@@ -167,8 +217,7 @@ struct FeedView: View {
             }
         }
         .refreshable {
-            await viewModel.loadFeed(refresh: true)
-            savedEventsStore.bootstrap(from: viewModel.events)
+            await reloadSelectedTab()
         }
     }
 
@@ -190,19 +239,150 @@ struct FeedView: View {
 
     private var emptyState: some View {
         VStack(spacing: Spacing.xl) {
-            Text("🗓️")
+            Text(emptyStateEmoji)
                 .font(.system(size: 48))
 
-            Text("Nothing \(selectedFilter.rawValue.lowercased())")
+            Text(emptyStateTitle)
                 .font(.headingMedium)
                 .foregroundColor(.textPrimary)
 
-            Text("Try a different time range or check back later.")
+            Text(emptyStateMessage)
                 .font(.bodyMedium)
                 .foregroundColor(.textSecondary)
                 .multilineTextAlignment(.center)
         }
         .padding(Spacing.xxxl)
+    }
+
+    private var errorState: some View {
+        LoadErrorCard(
+            title: selectedTab == .forYou ? "Feed unavailable" : "Events unavailable",
+            message: currentError ?? "Something went wrong while loading events.",
+            retry: {
+                Task { await reloadSelectedTab() }
+            }
+        )
+        .padding(.horizontal, Spacing.base)
+    }
+
+    private var currentEvents: [Event] {
+        switch selectedTab {
+        case .forYou:
+            return filteredEvents
+        case .bookmarked:
+            return bookmarkedEvents
+        case .going:
+            return viewModel.goingEvents
+        }
+    }
+
+    private var currentError: String? {
+        switch selectedTab {
+        case .forYou:
+            return viewModel.error
+        case .bookmarked:
+            return nil
+        case .going:
+            return viewModel.goingError
+        }
+    }
+
+    private var isCurrentTabLoading: Bool {
+        switch selectedTab {
+        case .forYou:
+            return viewModel.isLoading
+        case .bookmarked:
+            return false
+        case .going:
+            return viewModel.isLoadingGoing
+        }
+    }
+
+    private var subtitleText: String {
+        switch selectedTab {
+        case .forYou:
+            return viewModel.areaLabel
+        case .bookmarked:
+            return "\(bookmarkedEvents.count) saved event\(bookmarkedEvents.count == 1 ? "" : "s")"
+        case .going:
+            return "\(viewModel.goingEvents.count) event\(viewModel.goingEvents.count == 1 ? "" : "s") you're going to"
+        }
+    }
+
+    private var contentTabs: some View {
+        HStack(spacing: Spacing.sm) {
+            ForEach(FeedTab.allCases, id: \.self) { tab in
+                Button {
+                    withAnimation(.spring(response: 0.25)) {
+                        selectedTab = tab
+                    }
+                } label: {
+                    Text(tab.rawValue)
+                        .font(.captionSmall)
+                        .foregroundColor(selectedTab == tab ? .white : .textSecondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(selectedTab == tab ? Color.ember : Color.bgRaised)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(selectedTab == tab ? Color.clear : Color.bgBorder)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer()
+        }
+    }
+
+    private var emptyStateEmoji: String {
+        switch selectedTab {
+        case .forYou:
+            return "🗓️"
+        case .bookmarked:
+            return "🔖"
+        case .going:
+            return "✅"
+        }
+    }
+
+    private var emptyStateTitle: String {
+        switch selectedTab {
+        case .forYou:
+            return "Nothing \(selectedFilter.rawValue.lowercased())"
+        case .bookmarked:
+            return "No bookmarked events"
+        case .going:
+            return "No going events"
+        }
+    }
+
+    private var emptyStateMessage: String {
+        switch selectedTab {
+        case .forYou:
+            return "Try a different time range or check back later."
+        case .bookmarked:
+            return "Events you save will appear here."
+        case .going:
+            return "RSVP to an event and it will show up here."
+        }
+    }
+
+    private func reloadSelectedTab() async {
+        switch selectedTab {
+        case .forYou:
+            await viewModel.loadFeed(refresh: true)
+            await viewModel.loadGoingEvents()
+            let fetchedSavedEvents = (try? await APIService.shared.fetchSavedEvents()) ?? savedEventsStore.savedEvents
+            savedEventsStore.replaceSavedEvents(fetchedSavedEvents)
+            savedEventsStore.bootstrap(from: viewModel.events)
+        case .bookmarked:
+            let fetchedSavedEvents = (try? await APIService.shared.fetchSavedEvents()) ?? savedEventsStore.savedEvents
+            savedEventsStore.replaceSavedEvents(fetchedSavedEvents)
+        case .going:
+            await viewModel.loadGoingEvents()
+        }
     }
 }
 

@@ -5,17 +5,36 @@ import CoreLocation
 @MainActor
 final class FeedViewModel: ObservableObject {
     @Published var events: [Event] = []
+    @Published var goingEvents: [Event] = []
     @Published var isLoading = false
+    @Published var isLoadingGoing = false
     @Published var isLoadingMore = false
     @Published var error: String?
+    @Published var goingError: String?
+    @Published var areaLabel = AppConfig.defaultAreaLabel
 
     private var nextCursor: String?
     private var hasMore = true
     private var locationManager = CLLocationManager()
+    private let geocoder = CLGeocoder()
+    private var lastResolvedLocation: CLLocation?
+    private var storedUserCoordinate: CLLocationCoordinate2D? {
+        guard
+            let data = UserDefaults.standard.data(forKey: "current_user"),
+            let user = try? JSONDecoder().decode(User.self, from: data),
+            let latitude = user.latitude,
+            let longitude = user.longitude
+        else {
+            return nil
+        }
+
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
 
     var currentLocation: CLLocationCoordinate2D {
         locationManager.location?.coordinate ??
-        CLLocationCoordinate2D(latitude: 41.7991, longitude: -87.5876) // Hyde Park default
+        storedUserCoordinate ??
+        AppConfig.defaultCoordinate
     }
 
     func loadFeed(refresh: Bool = false) async {
@@ -30,10 +49,12 @@ final class FeedViewModel: ObservableObject {
 
         do {
             let loc = currentLocation
+            let actualCoordinate = locationManager.location?.coordinate ?? storedUserCoordinate
             let response = try await APIService.shared.fetchFeed(
                 lat: loc.latitude, lng: loc.longitude,
                 cursor: refresh ? nil : nextCursor
             )
+            await updateAreaLabel(from: response.events, currentCoordinate: actualCoordinate)
             if refresh {
                 events = response.events
             } else {
@@ -43,11 +64,27 @@ final class FeedViewModel: ObservableObject {
             nextCursor = response.nextCursor
             hasMore = response.nextCursor != nil
         } catch {
-            // Use mock data when backend is unavailable
-            if events.isEmpty {
-                events = Event.mockEvents
+            if isCancellation(error) {
+                return
             }
-            self.error = nil // Silently fall back to mock data
+            self.error = error.localizedDescription
+        }
+    }
+
+    func loadGoingEvents() async {
+        guard !isLoadingGoing else { return }
+        isLoadingGoing = true
+        goingError = nil
+        defer { isLoadingGoing = false }
+
+        do {
+            goingEvents = try await APIService.shared.fetchGoingEvents()
+        } catch {
+            if isCancellation(error) {
+                return
+            }
+            goingEvents = []
+            goingError = error.localizedDescription
         }
     }
 
@@ -110,6 +147,68 @@ final class FeedViewModel: ObservableObject {
             if let idx = events.firstIndex(where: { $0.id == eventId }) {
                 events[idx].userRSVPStatus = previousStatus
             }
+        }
+    }
+
+    private func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+
+        if let urlError = error as? URLError {
+            return urlError.code == .cancelled
+        }
+
+        if let apiError = error as? APIError {
+            switch apiError {
+            case .networkError(let underlying):
+                return isCancellation(underlying)
+            default:
+                break
+            }
+        }
+
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
+    }
+
+    private func updateAreaLabel(from events: [Event], currentCoordinate: CLLocationCoordinate2D?) async {
+        if let currentCoordinate,
+           let resolved = await reverseGeocodeLabel(
+                for: CLLocation(latitude: currentCoordinate.latitude, longitude: currentCoordinate.longitude)
+           ) {
+            areaLabel = resolved
+            return
+        }
+
+        areaLabel = AppConfig.defaultAreaLabel
+    }
+
+    private func reverseGeocodeLabel(for location: CLLocation) async -> String? {
+        if let lastResolvedLocation, location.distance(from: lastResolvedLocation) < 250 {
+            return areaLabel == AppConfig.defaultAreaLabel ? nil : areaLabel
+        }
+
+        do {
+            let placemarks = try await geocoder.reverseGeocodeLocation(location)
+            guard let placemark = placemarks.first else {
+                return nil
+            }
+
+            let parts = [placemark.subLocality, placemark.locality]
+                .compactMap { value in
+                    let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    return (trimmed?.isEmpty == false) ? trimmed : nil
+                }
+
+            guard !parts.isEmpty else {
+                return nil
+            }
+
+            lastResolvedLocation = location
+            return parts.joined(separator: " · ")
+        } catch {
+            return nil
         }
     }
 }

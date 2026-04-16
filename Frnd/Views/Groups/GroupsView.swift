@@ -63,29 +63,56 @@ final class GroupsViewModel: ObservableObject {
     }
 }
 
+@MainActor
+final class PublicGroupsViewModel: ObservableObject {
+    @Published var groups: [Group] = []
+    @Published var isLoading = false
+
+    func load() async {
+        isLoading = true
+        defer { isLoading = false }
+        groups = (try? await APIService.shared.fetchPublicGroups()) ?? []
+    }
+}
+
 // MARK: - Groups View
 
 struct GroupsView: View {
     @StateObject private var viewModel = GroupsViewModel()
+    @StateObject private var publicGroupsViewModel = PublicGroupsViewModel()
     @State private var showCreate = false
     @State private var showJoin = false
+    @State private var selectedSegment = 0
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.bgPrimary.ignoresSafeArea()
+                VStack(spacing: 0) {
+                    segmentPicker
+                        .padding(.horizontal, Spacing.base)
+                        .padding(.vertical, Spacing.sm)
 
-                if viewModel.isLoading && viewModel.groups.isEmpty {
-                    ProgressView().tint(.ember)
-                } else if viewModel.groups.isEmpty {
-                    emptyState
-                } else {
-                    groupsList
+                    switch selectedSegment {
+                    case 0:
+                        GroupsViewEmbedded(
+                            viewModel: viewModel,
+                            showCreate: $showCreate,
+                            showJoin: $showJoin
+                        )
+                    case 1:
+                        PublicGroupsViewEmbedded(
+                            viewModel: publicGroupsViewModel,
+                            groupsViewModel: viewModel
+                        )
+                    default:
+                        EmptyView()
+                    }
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .principal) {
                     Text("Groups")
                         .font(.headingMedium)
                         .foregroundColor(.textPrimary)
@@ -107,48 +134,37 @@ struct GroupsView: View {
         .sheet(isPresented: $showJoin) {
             JoinGroupSheet(viewModel: viewModel)
         }
-        .task { await viewModel.load() }
-    }
-
-    private var groupsList: some View {
-        ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: Spacing.base) {
-                ForEach(viewModel.groups) { group in
-                    NavigationLink(destination: GroupDetailView(group: group, viewModel: viewModel)) {
-                        GroupRowView(group: group)
-                    }
-                    .buttonStyle(.plain)
-                }
-                Color.clear.frame(height: 88)
+        .onAppear {
+            Task {
+                await viewModel.load()
+                await publicGroupsViewModel.load()
             }
-            .padding(.horizontal, Spacing.base)
-            .padding(.top, Spacing.base)
         }
     }
 
-    private var emptyState: some View {
-        VStack(spacing: Spacing.xl) {
-            Text("🏠")
-                .font(.system(size: 56))
-            Text("No groups yet")
-                .font(.headingMedium)
-                .foregroundColor(.textPrimary)
-            Text("Create a private space for your crew or join one with an invite code.")
-                .font(.bodyMedium)
-                .foregroundColor(.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Spacing.xxxl)
-            HStack(spacing: Spacing.base) {
-                Button("Create") { showCreate = true }
-                    .buttonStyle(PrimaryButtonStyle())
-                    .frame(maxWidth: .infinity)
-                Button("Join") { showJoin = true }
-                    .buttonStyle(SecondaryButtonStyle())
-                    .frame(maxWidth: .infinity)
+    private var segmentPicker: some View {
+        HStack(spacing: Spacing.sm) {
+            ForEach(Array(["My Groups", "Public Groups"].enumerated()), id: \.offset) { idx, label in
+                Button {
+                    withAnimation(.spring(response: 0.25)) {
+                        selectedSegment = idx
+                    }
+                } label: {
+                    Text(label)
+                        .font(.captionSmall)
+                        .foregroundColor(selectedSegment == idx ? .white : .textSecondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(selectedSegment == idx ? Color.ember : Color.bgRaised)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(selectedSegment == idx ? Color.clear : Color.bgBorder)
+                        )
+                }
+                .buttonStyle(.plain)
             }
-            .frame(maxWidth: 420)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, Spacing.xl)
+            Spacer()
         }
     }
 }
@@ -204,6 +220,192 @@ struct GroupRowView: View {
     }
 }
 
+// MARK: - Embedded Lists
+
+struct GroupsViewEmbedded: View {
+    @ObservedObject var viewModel: GroupsViewModel
+    @Binding var showCreate: Bool
+    @Binding var showJoin: Bool
+
+    var body: some View {
+        ZStack {
+            Color.bgPrimary.ignoresSafeArea()
+            if viewModel.isLoading && viewModel.groups.isEmpty {
+                ProgressView()
+                    .tint(.ember)
+            } else if viewModel.groups.isEmpty {
+                VStack(spacing: Spacing.xl) {
+                    Text("🏠")
+                        .font(.system(size: 56))
+                    Text("No groups yet")
+                        .font(.headingMedium)
+                        .foregroundColor(.textPrimary)
+                    Text("Create a private space for your crew or join one with an invite code.")
+                        .font(.bodyMedium)
+                        .foregroundColor(.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Spacing.xxxl)
+                    HStack(spacing: Spacing.base) {
+                        Button("Create") { showCreate = true }
+                            .buttonStyle(PrimaryButtonStyle())
+                            .frame(maxWidth: .infinity)
+                        Button("Join") { showJoin = true }
+                            .buttonStyle(SecondaryButtonStyle())
+                            .frame(maxWidth: .infinity)
+                    }
+                    .frame(maxWidth: 420)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, Spacing.xl)
+                }
+            } else {
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(spacing: Spacing.base) {
+                        ForEach(viewModel.groups) { group in
+                            NavigationLink(destination: GroupDetailView(group: group, viewModel: viewModel)) {
+                                GroupRowView(group: group)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Color.clear.frame(height: 88)
+                    }
+                    .padding(.horizontal, Spacing.base)
+                    .padding(.top, Spacing.base)
+                }
+            }
+        }
+    }
+}
+
+struct PublicGroupsViewEmbedded: View {
+    @ObservedObject var viewModel: PublicGroupsViewModel
+    @ObservedObject var groupsViewModel: GroupsViewModel
+    @State private var searchText = ""
+    @State private var sortOption: PublicGroupSort = .mostMembers
+
+    private enum PublicGroupSort: String, CaseIterable, Identifiable {
+        case mostMembers = "Most Members"
+        case newest = "Newest"
+        case name = "Name"
+
+        var id: String { rawValue }
+    }
+
+    private var displayedGroups: [Group] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filtered = viewModel.groups.filter { group in
+            guard !query.isEmpty else { return true }
+            return group.name.localizedCaseInsensitiveContains(query) ||
+                group.description.localizedCaseInsensitiveContains(query)
+        }
+
+        switch sortOption {
+        case .mostMembers:
+            return filtered.sorted {
+                if $0.memberCount == $1.memberCount {
+                    return $0.createdAt > $1.createdAt
+                }
+                return $0.memberCount > $1.memberCount
+            }
+        case .newest:
+            return filtered.sorted { $0.createdAt > $1.createdAt }
+        case .name:
+            return filtered.sorted {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Color.bgPrimary.ignoresSafeArea()
+            if viewModel.isLoading && viewModel.groups.isEmpty {
+                ProgressView()
+                    .tint(.ember)
+            } else if viewModel.groups.isEmpty {
+                VStack(spacing: Spacing.xl) {
+                    Text("🌍")
+                        .font(.system(size: 56))
+                    Text("No public groups")
+                        .font(.headingMedium)
+                        .foregroundColor(.textPrimary)
+                    Text("Public groups will appear here once people start opening them up.")
+                        .font(.bodyMedium)
+                        .foregroundColor(.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Spacing.xxxl)
+                }
+            } else {
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(spacing: Spacing.base) {
+                        VStack(spacing: Spacing.sm) {
+                            HStack(spacing: Spacing.sm) {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundColor(.textTertiary)
+                                TextField("Search public groups", text: $searchText)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                    .foregroundColor(.textPrimary)
+                            }
+                            .padding(.horizontal, Spacing.md)
+                            .padding(.vertical, Spacing.sm)
+                            .background(Color.bgRaised)
+                            .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Radius.md)
+                                    .strokeBorder(Color.bgBorder)
+                            )
+
+                            HStack {
+                                Text("\(displayedGroups.count) groups")
+                                    .font(.captionMedium)
+                                    .foregroundColor(.textSecondary)
+                                Spacer()
+                                Menu {
+                                    ForEach(PublicGroupSort.allCases) { option in
+                                        Button(option.rawValue) {
+                                            sortOption = option
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Text(sortOption.rawValue)
+                                            .font(.captionMedium)
+                                        Image(systemName: "arrow.up.arrow.down")
+                                            .font(.captionSmall)
+                                    }
+                                    .foregroundColor(.ember)
+                                }
+                            }
+                        }
+
+                        if displayedGroups.isEmpty {
+                            VStack(spacing: Spacing.sm) {
+                                Text("No matching groups")
+                                    .font(.headingSmall)
+                                    .foregroundColor(.textPrimary)
+                                Text("Try a different search or sort.")
+                                    .font(.captionMedium)
+                                    .foregroundColor(.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Spacing.xl)
+                        }
+
+                        ForEach(displayedGroups) { group in
+                            NavigationLink(destination: GroupDetailView(group: group, viewModel: groupsViewModel)) {
+                                GroupRowView(group: group)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Color.clear.frame(height: 88)
+                    }
+                    .padding(Spacing.base)
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Group Detail
 
 struct GroupDetailView: View {
@@ -216,6 +418,7 @@ struct GroupDetailView: View {
     @State private var isJoiningPublicGroup = false
     @State private var showJoinedPublicGroup = false
     @State private var actionError: String?
+    @State private var showDeleteGroupConfirmation = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppState
 
@@ -267,6 +470,8 @@ struct GroupDetailView: View {
 
                     // Activity posts
                     activitiesSection
+
+                    Color.clear.frame(height: 112)
                 }
                 .padding(Spacing.base)
             }
@@ -279,6 +484,14 @@ struct GroupDetailView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(actionError ?? "")
+        }
+        .alert("Delete Group?", isPresented: $showDeleteGroupConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete Group", role: .destructive) {
+                deleteGroup()
+            }
+        } message: {
+            Text("This will permanently remove the group and its content for everyone.")
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
@@ -295,14 +508,7 @@ struct GroupDetailView: View {
                         }
                         if isOwner {
                             Button("Delete Group", role: .destructive) {
-                                Task {
-                                    do {
-                                        try await viewModel.deleteGroup(id: group.id)
-                                        dismiss()
-                                    } catch {
-                                        actionError = error.localizedDescription
-                                    }
-                                }
+                                showDeleteGroupConfirmation = true
                             }
                         } else if isMember {
                             Button("Leave Group", role: .destructive) {
@@ -324,7 +530,7 @@ struct GroupDetailView: View {
             }
         }
         .sheet(isPresented: $showCreateActivity) {
-            CreateActivityView(groupId: group.id) { post in
+            CreateActivityView(groupId: group.id, group: group) { post in
                 activities.insert(post, at: 0)
             }
         }
@@ -506,21 +712,55 @@ struct GroupDetailView: View {
                     .foregroundColor(.textTertiary)
                     .padding(.vertical, Spacing.sm)
             } else {
-                LazyVStack(spacing: Spacing.sm) {
-                    ForEach(activities) { post in
-                        ActivityPostCard(
-                            post: post,
-                            canManageGroupPost: canManageGroup,
-                            onUpdate: { updated in
-                                if let idx = activities.firstIndex(where: { $0.id == updated.id }) {
-                                    activities[idx] = updated
-                                }
-                            },
-                            onDelete: { deletedId in
-                                activities.removeAll { $0.id == deletedId }
-                            }
-                        )
+                let announcements = activities.filter(\.isAnnouncement)
+                let activityPosts = activities.filter { !$0.isAnnouncement }
+
+                VStack(alignment: .leading, spacing: Spacing.lg) {
+                    if !announcements.isEmpty {
+                        postSection(title: "Announcements", posts: announcements)
                     }
+
+                    if !activityPosts.isEmpty {
+                        postSection(title: "Activities", posts: activityPosts)
+                    }
+
+                    if activityPosts.isEmpty {
+                        Text("No activities yet.")
+                            .font(.captionMedium)
+                            .foregroundColor(.textTertiary)
+                    }
+                    if announcements.isEmpty {
+                        Text("No announcements yet.")
+                            .font(.captionMedium)
+                            .foregroundColor(.textTertiary)
+                    }
+                }
+            }
+        }
+    }
+
+    private func postSection(title: String, posts: [ActivityPost]) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text(title)
+                .font(.captionSmall)
+                .foregroundColor(.textTertiary)
+                .textCase(.uppercase)
+                .tracking(1.5)
+
+            LazyVStack(spacing: Spacing.sm) {
+                ForEach(posts) { post in
+                    ActivityPostCard(
+                        post: post,
+                        onUpdate: { updated in
+                            if let idx = activities.firstIndex(where: { $0.id == updated.id }) {
+                                activities[idx] = updated
+                            }
+                        },
+                        onDelete: { deletedId in
+                            activities.removeAll { $0.id == deletedId }
+                        },
+                        canManageGroupPost: canManageGroup
+                    )
                 }
             }
         }
@@ -547,6 +787,17 @@ struct GroupDetailView: View {
             applyGroupUpdate(updated)
         } catch {
             actionError = error.localizedDescription
+        }
+    }
+
+    private func deleteGroup() {
+        Task {
+            do {
+                try await viewModel.deleteGroup(id: group.id)
+                dismiss()
+            } catch {
+                actionError = error.localizedDescription
+            }
         }
     }
 }
@@ -591,6 +842,7 @@ struct EditGroupSheet: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
+                .scrollDismissesKeyboard(.immediately)
             }
             .navigationTitle("Edit Group")
             .navigationBarTitleDisplayMode(.inline)
@@ -667,6 +919,7 @@ struct CreateGroupSheet: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
+                .scrollDismissesKeyboard(.immediately)
             }
             .navigationTitle("New Group")
             .navigationBarTitleDisplayMode(.inline)
@@ -713,6 +966,9 @@ struct JoinGroupSheet: View {
         NavigationStack {
             ZStack {
                 Color.bgPrimary.ignoresSafeArea()
+                    .onTapGesture {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
                 VStack(spacing: Spacing.xl) {
                     Text("🔑")
                         .font(.system(size: 56))

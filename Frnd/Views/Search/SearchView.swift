@@ -7,7 +7,9 @@ final class SearchViewModel: ObservableObject {
     @Published var searchText = ""
     @Published var results: [Event] = []
     @Published var isSearching = false
+    @Published var searchError: String?
     @Published var selectedCategory: EventCategory?
+    @Published var trendingError: String?
 
     private var searchTask: Task<Void, Never>?
 
@@ -15,20 +17,20 @@ final class SearchViewModel: ObservableObject {
         let query = searchText.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else {
             results = []
+            searchError = nil
             return
         }
         searchTask?.cancel()
         isSearching = true
+        searchError = nil
         searchTask = Task {
             try? await Task.sleep(nanoseconds: 300_000_000) // 300ms debounce
             guard !Task.isCancelled else { return }
             do {
                 results = try await APIService.shared.searchEvents(query: query)
             } catch {
-                results = Event.mockEvents.filter {
-                    $0.title.localizedCaseInsensitiveContains(query) ||
-                    $0.tags.contains { $0.localizedCaseInsensitiveContains(query) }
-                }
+                results = []
+                searchError = error.localizedDescription
             }
             isSearching = false
         }
@@ -41,12 +43,14 @@ final class SearchViewModel: ObservableObject {
     @Published var trending: [Event] = []
 
     func loadTrending() async {
+        trendingError = nil
         do {
-            let loc = CLLocationCoordinate2D(latitude: 41.7991, longitude: -87.5876)
+            let loc = AppConfig.defaultCoordinate
             let response = try await APIService.shared.fetchFeed(lat: loc.latitude, lng: loc.longitude)
             trending = response.events
         } catch {
-            trending = Event.mockEvents
+            trending = []
+            trendingError = error.localizedDescription
         }
     }
 
@@ -62,6 +66,7 @@ struct SearchView: View {
     @StateObject private var viewModel = SearchViewModel()
     @State private var showEventDetail: Event?
     @State private var plans: [Plan] = []
+    @State private var plansError: String?
     @State private var showPlanDetail: Plan?
 
     var body: some View {
@@ -123,7 +128,13 @@ struct SearchView: View {
             }
             .task {
                 await viewModel.loadTrending()
-                plans = (try? await APIService.shared.fetchMyPlans()) ?? []
+                do {
+                    plans = try await APIService.shared.fetchMyPlans()
+                    plansError = nil
+                } catch {
+                    plans = []
+                    plansError = error.localizedDescription
+                }
             }
             .sheet(item: $showEventDetail) { event in
                 EventDetailView(event: event)
@@ -140,6 +151,26 @@ struct SearchView: View {
 
     private var browseContent: some View {
         VStack(alignment: .leading, spacing: Spacing.xl) {
+            if let error = viewModel.trendingError ?? plansError {
+                LoadErrorCard(
+                    title: "Explore data unavailable",
+                    message: error,
+                    retry: {
+                        Task {
+                            await viewModel.loadTrending()
+                            do {
+                                plans = try await APIService.shared.fetchMyPlans()
+                                plansError = nil
+                            } catch {
+                                plans = []
+                                plansError = error.localizedDescription
+                            }
+                        }
+                    }
+                )
+                .padding(.horizontal, Spacing.base)
+            }
+
             // Category pills
             VStack(alignment: .leading, spacing: Spacing.md) {
                 sectionLabel("Browse by Vibe")
@@ -157,7 +188,7 @@ struct SearchView: View {
 
             // Curated collections
             VStack(alignment: .leading, spacing: Spacing.md) {
-                sectionLabel("Curated for Chicago")
+                sectionLabel("Curated Picks")
                     .padding(.horizontal, Spacing.base)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: Spacing.md) {
@@ -207,13 +238,20 @@ struct SearchView: View {
                 sectionLabel("Trending Now")
                     .padding(.horizontal, Spacing.base)
 
-                ForEach(viewModel.filteredTrending.prefix(4)) { event in
-                    Button {
-                        showEventDetail = event
-                    } label: {
-                        SearchResultRow(event: event)
+                if viewModel.filteredTrending.isEmpty {
+                    Text(viewModel.trendingError == nil ? "No trending events right now." : "Trending events could not be loaded.")
+                        .font(.bodyMedium)
+                        .foregroundColor(.textSecondary)
+                        .padding(.horizontal, Spacing.base)
+                } else {
+                    ForEach(viewModel.filteredTrending.prefix(4)) { event in
+                        Button {
+                            showEventDetail = event
+                        } label: {
+                            SearchResultRow(event: event)
+                        }
+                        .padding(.horizontal, Spacing.base)
                     }
-                    .padding(.horizontal, Spacing.base)
                 }
             }
         }
@@ -230,6 +268,14 @@ struct SearchView: View {
                     Spacer()
                 }
                 .padding(.vertical, Spacing.xl)
+            } else if let error = viewModel.searchError {
+                LoadErrorCard(
+                    title: "Search failed",
+                    message: error,
+                    retryTitle: "Search Again",
+                    retry: { viewModel.search() }
+                )
+                .padding(.horizontal, Spacing.base)
             } else if viewModel.results.isEmpty {
                 VStack(spacing: Spacing.md) {
                     Text("🔍")
@@ -286,12 +332,7 @@ struct SearchView: View {
         }
     }
 
-    private var curatedCollections: [CuratedCollection] {[
-        CuratedCollection(title: "Date Night in Hyde Park", subtitle: "Intimate venues, great vibes", emoji: "🥂", color: .rose),
-        CuratedCollection(title: "Friday Under $20", subtitle: "Great nights, budget friendly", emoji: "💸", color: .teal),
-        CuratedCollection(title: "Live Music This Week", subtitle: "Concerts & jazz nights", emoji: "🎸", color: .ember),
-        CuratedCollection(title: "Weekend Brunch Spots", subtitle: "Sun, food, friends", emoji: "☀️", color: .gold),
-    ]}
+    private var curatedCollections: [CuratedCollection] { AppConfig.curatedCollections }
 }
 
 // MARK: - Curated Card

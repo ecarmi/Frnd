@@ -9,9 +9,6 @@ struct OnboardingView: View {
     @State private var name: String = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var isDevMode = false
-
-    private let devBypassEmail = "ecarmi@uchicago.edu"
 
     enum OnboardingStep {
         case welcome, email, otp, name, vibes, done
@@ -40,7 +37,7 @@ struct OnboardingView: View {
                     switch step {
                     case .welcome: WelcomeStep(onContinue: { withAnimation { step = .email } })
                     case .email:   EmailStep(email: $email, isLoading: $isLoading, error: $errorMessage, onContinue: sendEmailOTP)
-                    case .otp:     OTPStep(otp: $otp, email: email, isLoading: $isLoading, error: $errorMessage, isDevMode: isDevMode, onContinue: verifyOTP, onBack: { step = .email })
+                    case .otp:     OTPStep(otp: $otp, email: email, isLoading: $isLoading, error: $errorMessage, onContinue: verifyOTP, onBack: { step = .email })
                     case .name:    NameStep(name: $name, onContinue: { withAnimation { step = .vibes } })
                     case .vibes:   VibeSelectionStep(selected: $selectedVibes, isLoading: $isLoading, onContinue: completeOnboarding)
                     case .done:    EmptyView()
@@ -80,14 +77,7 @@ struct OnboardingView: View {
                 try await APIService.shared.requestEmailOTP(email: trimmed)
                 withAnimation { step = .otp }
             } catch {
-                // Backend unreachable — fall back to dev mode in DEBUG
-                #if DEBUG
-                isDevMode = true
-                errorMessage = "Dev mode — use code 000000"
-                withAnimation { step = .otp }
-                #else
                 errorMessage = error.localizedDescription
-                #endif
             }
         }
     }
@@ -107,51 +97,12 @@ struct OnboardingView: View {
                     withAnimation { step = .name }
                 }
             } catch {
-                // Backend unreachable — fall back to fully local mock only if dev mode
-                #if DEBUG
-                if isDevMode && otp == "000000" {
-                    let mockUser = User(
-                        id: UUID().uuidString,
-                        email: trimmed,
-                        phone: nil,
-                        university: trimmed.hasSuffix("uchicago.edu") ? "University of Chicago" : nil,
-                        name: "",
-                        avatarURL: nil,
-                        latitude: 41.7991,
-                        longitude: -87.5876,
-                        onboardingComplete: false,
-                        createdAt: Date()
-                    )
-                    appState.setUser(mockUser)
-                    withAnimation { step = .name }
-                    return
-                }
-                #endif
                 errorMessage = error.localizedDescription
             }
         }
     }
 
     private func completeOnboarding() {
-        #if DEBUG
-        if isDevMode {
-            guard let current = appState.currentUser else { return }
-            let completed = User(
-                id: current.id,
-                email: current.email,
-                phone: current.phone,
-                university: current.university,
-                name: name.isEmpty ? "Dev User" : name,
-                avatarURL: nil,
-                latitude: current.latitude,
-                longitude: current.longitude,
-                onboardingComplete: true,
-                createdAt: current.createdAt
-            )
-            appState.setUser(completed)
-            return
-        }
-        #endif
         isLoading = true
         Task {
             defer { isLoading = false }
@@ -202,21 +153,18 @@ private struct EmailStep: View {
     @Binding var error: String?
     let onContinue: () -> Void
 
-    // Add your school's domain here when expanding to new universities
-    private let allowedDomains = ["uchicago.edu"]
-
     private var isValidEmail: Bool {
         let lower = email.lowercased()
-        return lower.contains("@") && allowedDomains.contains(where: { lower.hasSuffix($0) })
+        return lower.contains("@") && AppConfig.allowedEmailDomains.contains(where: { lower.hasSuffix($0) })
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 32) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("UChicago students")
+                Text(AppConfig.launchCampusLabel)
                     .font(.displayMedium)
                     .foregroundColor(.textPrimary)
-                Text("Frnd is launching at UChicago first. Sign in with your uchicago.edu email to join your campus community.")
+                Text(AppConfig.launchCampusDescription)
                     .font(.bodyLarge)
                     .foregroundColor(.textSecondary)
             }
@@ -225,7 +173,7 @@ private struct EmailStep: View {
                 TextField(
                     "",
                     text: $email,
-                    prompt: Text("you@uchicago.edu").foregroundColor(.textTertiary)
+                    prompt: Text("you@school.edu").foregroundColor(.textTertiary)
                 )
                 .font(.bodyLarge)
                 .foregroundColor(.textPrimary)
@@ -240,7 +188,7 @@ private struct EmailStep: View {
                 if let error = error {
                     Text(error)
                         .font(.captionMedium)
-                        .foregroundColor(error.contains("Dev mode") ? .teal : .rose)
+                        .foregroundColor(.rose)
                 }
             }
 
@@ -264,7 +212,6 @@ private struct OTPStep: View {
     let email: String
     @Binding var isLoading: Bool
     @Binding var error: String?
-    let isDevMode: Bool
     let onContinue: () -> Void
     let onBack: () -> Void
 
@@ -274,7 +221,7 @@ private struct OTPStep: View {
                 Text("Check your email")
                     .font(.displayMedium)
                     .foregroundColor(.textPrimary)
-                Text(isDevMode ? "Dev mode active" : "Sent to \(email)")
+                Text("Sent to \(email)")
                     .font(.bodyLarge)
                     .foregroundColor(.textSecondary)
             }
@@ -297,7 +244,7 @@ private struct OTPStep: View {
                 if let error = error {
                     Text(error)
                         .font(.captionMedium)
-                        .foregroundColor(error.contains("Dev") ? .teal : .rose)
+                        .foregroundColor(.rose)
                 }
             }
 

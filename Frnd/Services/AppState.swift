@@ -13,6 +13,7 @@ final class AppState: ObservableObject {
     @Published var onboardingComplete: Bool = false
     @Published var isLoading: Bool = false
     @Published var pendingDeepLink: DeepLink?
+    @Published var plansRefreshID = UUID()
 
     static let shared = AppState()
 
@@ -67,5 +68,9 @@ final class AppState: ObservableObject {
         case "plan":  pendingDeepLink = .joinPlan(code: code)
         default: break
         }
+    }
+
+    func refreshPlansScreen() {
+        plansRefreshID = UUID()
     }
 }

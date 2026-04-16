@@ -504,7 +504,7 @@ struct ActivityPost: Codable, Identifiable {
     let location: String?
     let latitude: Double?
     let longitude: Double?
-    let scheduledTime: Date?
+    let scheduledTime: Date
     let maxParticipants: Int?
     let groupId: String?
     let groupName: String?

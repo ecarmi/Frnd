@@ -167,9 +167,11 @@ async def get_feed(
 
     # 6. User's own saved events and RSVPs — two queries (not per-event)
     saved_result = await db.execute(
-        select(SavedEvent.event_id).where(SavedEvent.user_id == user.id)
+        select(SavedEvent.event_id, SavedEvent.activity_id).where(SavedEvent.user_id == user.id)
     )
-    saved_ids = {row[0] for row in saved_result.all()}
+    saved_rows = saved_result.all()
+    saved_ids = {event_id for event_id, _ in saved_rows if event_id}
+    saved_activity_ids = {activity_id for _, activity_id in saved_rows if activity_id}
 
     rsvp_result = await db.execute(
         select(RSVP).where(RSVP.user_id == user.id)
@@ -279,7 +281,15 @@ async def get_feed(
         participation_score = min(1.0, len(post.participants) / 6.0)
         membership_score = 1.0 if post.group_id in member_group_ids else 0.55
         final = 0.55 * t_score + 0.25 * participation_score + 0.20 * membership_score
-        scored_items.append((final, _build_group_activity_feed_out(post, post.group, user.id)))
+        scored_items.append((
+            final,
+            _build_group_activity_feed_out(
+                post,
+                post.group,
+                user.id,
+                is_saved=post.id in saved_activity_ids,
+            ),
+        ))
 
     scored_items.sort(key=lambda item: item[0], reverse=True)
     return [item for _, item in scored_items[:limit]], None
@@ -316,7 +326,13 @@ def _activity_category(activity_type: ActivityTypeEnum) -> EventCategoryEnum:
     return mapping.get(activity_type, EventCategoryEnum.other)
 
 
-def _build_group_activity_feed_out(post: ActivityPost, group: Group, current_user_id: str) -> EventOut:
+def _build_group_activity_feed_out(
+    post: ActivityPost,
+    group: Group,
+    current_user_id: str,
+    *,
+    is_saved: bool = False,
+) -> EventOut:
     participant_users = [p.user for p in post.participants if p.user and p.user_id != current_user_id][:8]
     user_joined = any(p.user_id == current_user_id for p in post.participants)
     visibility_label = "Members only" if post.is_members_only else "Open to everyone"
@@ -358,7 +374,7 @@ def _build_group_activity_feed_out(post: ActivityPost, group: Group, current_use
         total_interested=len(post.participants),
         user_rsvp_status=RSVPStatusEnum.going if user_joined else None,
         ai_reason_chip=f"{group.name} · {visibility_label}",
-        is_saved=False,
+        is_saved=is_saved,
     )
 
 

@@ -38,7 +38,7 @@ struct EventDetailView: View {
                     // Title block
                     VStack(alignment: .leading, spacing: Spacing.sm) {
                         HStack {
-                            PillView(text: event.startTime.relativeEventTime, color: .ember)
+                            PillView(text: primaryTimeLabel, color: .ember)
                             PillView(text: event.priceDisplay, color: event.isFree ? .teal : .textSecondary)
                             Spacer()
                             PillView(text: event.category.displayName, color: Color.categoryColor(for: event.category))
@@ -224,18 +224,18 @@ struct EventDetailView: View {
             }
             .disabled(isRSVPLoading)
 
-            if event.activityPostId == nil {
-                Button {
-                    Task { try? await savedEventsStore.toggle(event: event) }
-                } label: {
-                    Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
-                        .font(.system(size: 20))
-                        .foregroundColor(isSaved ? .ember : .textSecondary)
-                        .frame(width: 48, height: 48)
-                        .background(Color.bgRaised)
-                        .clipShape(RoundedRectangle(cornerRadius: Radius.md))
-                }
+            Button {
+                Task { try? await savedEventsStore.toggle(event: event) }
+            } label: {
+                Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+                    .font(.system(size: 20))
+                    .foregroundColor(isSaved ? .ember : .textSecondary)
+                    .frame(width: 48, height: 48)
+                    .background(Color.bgRaised)
+                    .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+            }
 
+            if event.activityPostId == nil {
                 Button {
                     showCreatePlan = true
                 } label: {
@@ -312,6 +312,19 @@ struct EventDetailView: View {
         guard let refreshed = try? await APIService.shared.fetchEvent(id: event.id) else { return }
         event = refreshed
         rsvpStatus = refreshed.userRSVPStatus
+    }
+
+    private var primaryTimeLabel: String {
+        guard event.activityPostId != nil else { return event.startTime.relativeEventTime }
+
+        let calendar = Calendar.current
+        if calendar.isDateInToday(event.startTime) {
+            return "Tonight, \(event.startTime.formatted(date: .omitted, time: .shortened))"
+        }
+        if calendar.isDateInTomorrow(event.startTime) {
+            return "Tomorrow, \(event.startTime.formatted(date: .omitted, time: .shortened))"
+        }
+        return event.startTime.formatted(date: .abbreviated, time: .shortened)
     }
 
     // MARK: - Venue Section

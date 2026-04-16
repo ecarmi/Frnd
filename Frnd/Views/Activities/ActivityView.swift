@@ -122,6 +122,9 @@ struct ActivityPostCard: View {
     @EnvironmentObject private var appState: AppState
     @State private var isLoading = false
     @State private var showEdit = false
+    @State private var showDeleteConfirmation = false
+    @State private var joinedOverride: Bool?
+    @State private var participantCountOverride: Int?
 
     private var isCreator: Bool {
         post.creatorId == appState.currentUser?.id
@@ -129,6 +132,14 @@ struct ActivityPostCard: View {
 
     private var canEditPost: Bool {
         isCreator || canManageGroupPost
+    }
+
+    private var isJoined: Bool {
+        joinedOverride ?? post.isJoined
+    }
+
+    private var participantCount: Int {
+        participantCountOverride ?? post.participantCount
     }
 
     var body: some View {
@@ -141,11 +152,9 @@ struct ActivityPostCard: View {
                     Text(post.creator?.name ?? "Someone")
                         .font(.bodyMedium)
                         .foregroundColor(.textPrimary)
-                    if let time = post.scheduledTime {
-                        Text(time, style: .relative)
-                            .font(.captionSmall)
-                            .foregroundColor(.textTertiary)
-                    }
+                    Text(post.scheduledTime.formatted(date: .abbreviated, time: .shortened))
+                        .font(.captionSmall)
+                        .foregroundColor(.textTertiary)
                 }
 
                 Spacer()
@@ -154,17 +163,10 @@ struct ActivityPostCard: View {
                     Menu {
                         Button("Edit") { showEdit = true }
                         Button("Delete", role: .destructive) {
-                            Task {
-                                isLoading = true
-                                defer { isLoading = false }
-                                do {
-                                    try await APIService.shared.deleteActivity(id: post.id)
-                                    onDelete?(post.id)
-                                } catch {}
-                            }
+                            showDeleteConfirmation = true
                         }
                     } label: {
-                        Image(systemName: "ellipsis")
+                        Image(systemName: "pencil")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.textTertiary)
                             .frame(width: 28, height: 28)
@@ -215,9 +217,9 @@ struct ActivityPostCard: View {
                 }
                 if let max = post.maxParticipants {
                     Spacer()
-                    Text("\(post.participantCount)/\(max)")
+                    Text("\(participantCount)/\(max)")
                         .font(.captionMedium)
-                        .foregroundColor(post.participantCount >= max ? .rose : .textSecondary)
+                        .foregroundColor(participantCount >= max ? .rose : .textSecondary)
                 }
             }
 
@@ -239,10 +241,24 @@ struct ActivityPostCard: View {
         }
         .padding(Spacing.base)
         .cardStyle()
+        .onChange(of: post.isJoined) {
+            joinedOverride = nil
+        }
+        .onChange(of: post.participantCount) {
+            participantCountOverride = nil
+        }
         .sheet(isPresented: $showEdit) {
             CreateActivityView(existingPost: post) { updated in
                 onUpdate(updated)
             }
+        }
+        .alert(deleteAlertTitle, isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                deletePost()
+            }
+        } message: {
+            Text(deleteAlertMessage)
         }
     }
 
@@ -251,31 +267,66 @@ struct ActivityPostCard: View {
             Task {
                 isLoading = true
                 defer { isLoading = false }
+
+                let previousJoined = isJoined
+                let previousCount = participantCount
                 do {
-                    if post.isJoined {
+                    if isJoined {
+                        joinedOverride = false
+                        participantCountOverride = max(0, previousCount - 1)
                         try await APIService.shared.leaveActivity(id: post.id)
                         let updated = try await APIService.shared.fetchActivity(id: post.id)
+                        joinedOverride = updated.isJoined
+                        participantCountOverride = updated.participantCount
                         onUpdate(updated)
                     } else {
+                        joinedOverride = true
+                        participantCountOverride = previousCount + 1
                         let updated = try await APIService.shared.joinActivity(id: post.id)
+                        joinedOverride = updated.isJoined
+                        participantCountOverride = updated.participantCount
                         onUpdate(updated)
                     }
-                } catch {}
+                } catch {
+                    joinedOverride = previousJoined
+                    participantCountOverride = previousCount
+                }
             }
         } label: {
             if isLoading {
                 ProgressView().scaleEffect(0.7).tint(.ember)
             } else {
-                Text(post.isJoined ? "Joined ✓" : "Join")
+                Text(isJoined ? "Joined ✓" : "Join")
                     .font(.captionMedium.bold())
-                    .foregroundColor(post.isJoined ? .teal : .bgPrimary)
+                    .foregroundColor(isJoined ? .teal : .bgPrimary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 6)
-                    .background(post.isJoined ? Color.teal.opacity(0.2) : Color.ember)
+                    .background(isJoined ? Color.teal.opacity(0.2) : Color.ember)
                     .clipShape(Capsule())
             }
         }
         .disabled(isLoading || post.status != .open)
+    }
+
+    private var deleteAlertTitle: String {
+        post.isAnnouncement ? "Delete Announcement?" : "Delete Activity?"
+    }
+
+    private var deleteAlertMessage: String {
+        post.isAnnouncement
+            ? "This announcement will be removed for everyone in the group."
+            : "This activity will be removed for everyone who can see it."
+    }
+
+    private func deletePost() {
+        Task {
+            isLoading = true
+            defer { isLoading = false }
+            do {
+                try await APIService.shared.deleteActivity(id: post.id)
+                onDelete?(post.id)
+            } catch {}
+        }
     }
 }
 
@@ -283,6 +334,7 @@ struct ActivityPostCard: View {
 
 struct CreateActivityView: View {
     let fixedGroupId: String?
+    let fixedGroup: Group?
     let existingPost: ActivityPost?
     let onSaved: (ActivityPost) -> Void
 
@@ -293,8 +345,8 @@ struct CreateActivityView: View {
     @State private var activityType: ActivityType
     @State private var location: String
     @State private var scheduledTime: Date
-    @State private var hasTime: Bool
     @State private var maxParticipants: String
+    @FocusState private var maxParticipantsFocused: Bool
     @State private var isLoading = false
     @State private var error: String?
     @State private var groups: [Group] = []
@@ -304,10 +356,12 @@ struct CreateActivityView: View {
 
     init(
         groupId: String? = nil,
+        group: Group? = nil,
         existingPost: ActivityPost? = nil,
         onCreated: @escaping (ActivityPost) -> Void
     ) {
         self.fixedGroupId = groupId
+        self.fixedGroup = group
         self.existingPost = existingPost
         self.onSaved = onCreated
         _title = State(initialValue: existingPost?.title ?? "")
@@ -315,7 +369,6 @@ struct CreateActivityView: View {
         _activityType = State(initialValue: existingPost?.activityType ?? .social)
         _location = State(initialValue: existingPost?.location ?? "")
         _scheduledTime = State(initialValue: existingPost?.scheduledTime ?? Date().addingTimeInterval(3600 * 2))
-        _hasTime = State(initialValue: existingPost?.scheduledTime != nil)
         _maxParticipants = State(initialValue: existingPost?.maxParticipants.map(String.init) ?? "")
         _selectedGroupId = State(initialValue: existingPost?.groupId)
         _isMembersOnly = State(initialValue: existingPost?.isMembersOnly ?? (groupId != nil))
@@ -325,10 +378,14 @@ struct CreateActivityView: View {
     private var resolvedGroupId: String? { fixedGroupId ?? selectedGroupId }
     private var canPickGroup: Bool { fixedGroupId == nil && !adminGroups.isEmpty }
     private var selectedGroup: Group? {
-        adminGroups.first { $0.id == resolvedGroupId }
+        if let fixedGroup, fixedGroup.id == resolvedGroupId {
+            return fixedGroup
+        }
+        return adminGroups.first { $0.id == resolvedGroupId }
     }
     private var isGroupPost: Bool { resolvedGroupId != nil }
     private var allowsAnnouncements: Bool { selectedGroup?.isPrivate == false && isGroupPost }
+    private var isEditingAnnouncement: Bool { existingPost?.isAnnouncement == true }
     private var adminGroups: [Group] {
         guard let currentUserId = appState.currentUser?.id else { return [] }
         return groups.filter { group in
@@ -343,35 +400,6 @@ struct CreateActivityView: View {
             ZStack {
                 Color.bgPrimary.ignoresSafeArea()
                 Form {
-                    Section("What's the plan?") {
-                        TextField("Title", text: $title)
-                            .foregroundColor(.textPrimary)
-                        TextField("Details (optional)", text: $description, axis: .vertical)
-                            .foregroundColor(.textPrimary)
-                            .lineLimit(3...6)
-                    }
-
-                    Section("Type") {
-                        Picker("Activity Type", selection: $activityType) {
-                            ForEach(ActivityType.allCases, id: \.self) { type in
-                                Text("\(type.emoji) \(type.displayName)").tag(type)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .foregroundColor(.textPrimary)
-                    }
-
-                    if isGroupPost {
-                        Section("Visibility") {
-                            Toggle("Members only", isOn: $isMembersOnly)
-                            Text(isMembersOnly
-                                 ? "Only group members will see this in the group and For You."
-                                 : "Anyone can discover this from For You, and group members will still see it too.")
-                                .font(.captionMedium)
-                                .foregroundColor(.textSecondary)
-                        }
-                    }
-
                     if allowsAnnouncements {
                         Section("Post Type") {
                             Picker("Post Type", selection: $isAnnouncement) {
@@ -380,26 +408,69 @@ struct CreateActivityView: View {
                             }
                             .pickerStyle(.segmented)
                             .disabled(existingPost != nil)
-                            Text("Announcements are for updates from group admins. Activities are joinable plans.")
+                            Text("Announcements are for updates from group admins. They are currently member-only and will later connect to push notifications.")
                                 .font(.captionMedium)
                                 .foregroundColor(.textSecondary)
                         }
                     }
 
-                    Section("Where & When") {
-                        TextField("Location", text: $location)
-                            .foregroundColor(.textPrimary)
-                        Toggle("Set a time", isOn: $hasTime)
-                        if hasTime {
-                            DatePicker("Time", selection: $scheduledTime, displayedComponents: [.date, .hourAndMinute])
+                    if isAnnouncement || isEditingAnnouncement {
+                        Section("Announcement") {
+                            TextField("Subject", text: $title)
                                 .foregroundColor(.textPrimary)
+                            TextField("Message", text: $description, axis: .vertical)
+                                .foregroundColor(.textPrimary)
+                                .lineLimit(4...8)
+                        }
+
+                        Section("Delivery") {
+                            Text("This announcement is member-only.")
+                                .font(.captionMedium)
+                                .foregroundColor(.textSecondary)
+                        }
+                    } else {
+                        Section("What's the plan?") {
+                            TextField("Title", text: $title)
+                                .foregroundColor(.textPrimary)
+                            TextField("Details (optional)", text: $description, axis: .vertical)
+                                .foregroundColor(.textPrimary)
+                                .lineLimit(3...6)
+                        }
+
+                        Section("Type") {
+                            Picker("Activity Type", selection: $activityType) {
+                                ForEach(ActivityType.allCases, id: \.self) { type in
+                                    Text("\(type.emoji) \(type.displayName)").tag(type)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .foregroundColor(.textPrimary)
                         }
                     }
 
-                    if !isAnnouncement {
+                    if isGroupPost && !(isAnnouncement || isEditingAnnouncement) {
+                        Section("Visibility") {
+                            Toggle("Members only", isOn: $isMembersOnly)
+                            Text(isMembersOnly
+                                 ? "Only group members will see this."
+                                 : "Anyone can discover this from For You, and group members will still see it too.")
+                                .font(.captionMedium)
+                                .foregroundColor(.textSecondary)
+                        }
+                    }
+
+                    if !(isAnnouncement || isEditingAnnouncement) {
+                        Section("Where & When") {
+                            TextField("Location", text: $location)
+                                .foregroundColor(.textPrimary)
+                            DatePicker("Time", selection: $scheduledTime, displayedComponents: [.date, .hourAndMinute])
+                                .foregroundColor(.textPrimary)
+                        }
+
                         Section("Spots") {
                             TextField("Max participants (optional)", text: $maxParticipants)
                                 .keyboardType(.numberPad)
+                                .focused($maxParticipantsFocused)
                                 .foregroundColor(.textPrimary)
                         }
                     }
@@ -422,7 +493,19 @@ struct CreateActivityView: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
+                .scrollDismissesKeyboard(.immediately)
+                .simultaneousGesture(TapGesture().onEnded {
+                    maxParticipantsFocused = false
+                })
                 .task { groups = (try? await APIService.shared.fetchMyGroups()) ?? [] }
+            }
+            .alert("Couldn't Post", isPresented: Binding(
+                get: { error != nil },
+                set: { if !$0 { error = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(error ?? "")
             }
             .navigationTitle(existingPost == nil ? "New Activity" : "Edit Activity")
             .navigationBarTitleDisplayMode(.inline)
@@ -445,6 +528,7 @@ struct CreateActivityView: View {
                                 let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
                                 let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
                                 let trimmedLocation = location.trimmingCharacters(in: .whitespacesAndNewlines)
+                                let announcementMode = isEditingAnnouncement || isAnnouncement
 
                                 let post: ActivityPost
                                 if let existingPost {
@@ -453,28 +537,28 @@ struct CreateActivityView: View {
                                         title: trimmedTitle,
                                         description: trimmedDescription,
                                         activityType: activityType,
-                                        location: trimmedLocation.isEmpty ? nil : trimmedLocation,
+                                        location: announcementMode ? nil : (trimmedLocation.isEmpty ? nil : trimmedLocation),
                                         latitude: nil,
                                         longitude: nil,
-                                        scheduledTime: hasTime ? scheduledTime : nil,
-                                        maxParticipants: maxP,
+                                        scheduledTime: announcementMode ? Date() : scheduledTime,
+                                        maxParticipants: announcementMode ? nil : maxP,
                                         groupId: resolvedGroupId,
-                                        isMembersOnly: isGroupPost ? isMembersOnly : nil,
-                                        isAnnouncement: existingPost?.isAnnouncement ?? isAnnouncement
+                                        isMembersOnly: announcementMode ? true : (isGroupPost ? isMembersOnly : nil),
+                                        isAnnouncement: existingPost.isAnnouncement
                                     )
                                 } else {
                                     post = try await APIService.shared.createActivity(
                                         title: trimmedTitle,
                                         description: trimmedDescription,
                                         activityType: activityType,
-                                        location: trimmedLocation.isEmpty ? nil : trimmedLocation,
+                                        location: announcementMode ? nil : (trimmedLocation.isEmpty ? nil : trimmedLocation),
                                         latitude: nil,
                                         longitude: nil,
-                                        scheduledTime: hasTime ? scheduledTime : nil,
-                                        maxParticipants: maxP,
+                                        scheduledTime: announcementMode ? Date() : scheduledTime,
+                                        maxParticipants: announcementMode ? nil : maxP,
                                         groupId: resolvedGroupId,
-                                        isMembersOnly: isGroupPost ? isMembersOnly : nil,
-                                        isAnnouncement: isAnnouncement
+                                        isMembersOnly: announcementMode ? true : (isGroupPost ? isMembersOnly : nil),
+                                        isAnnouncement: announcementMode
                                     )
                                 }
                                 onSaved(post)

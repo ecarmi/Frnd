@@ -102,6 +102,7 @@ struct CreatePlanView: View {
                     .padding(.horizontal, Spacing.base)
                     .padding(.top, Spacing.base)
                 }
+                .scrollDismissesKeyboard(.immediately)
             }
             .navigationTitle("New Plan")
             .navigationBarTitleDisplayMode(.inline)

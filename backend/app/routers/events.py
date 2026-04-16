@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from ..database import get_db
 from ..models import (
-    User, Event, Venue, RSVP, RSVPStatusEnum, SavedEvent,
+    User, Event, Venue, RSVP, RSVPStatusEnum, SavedEvent, ActivityPost,
     Group, GroupMembership, GroupRoleEnum,
 )
 from ..schemas import EventOut, EventCreate, RSVPOut, RSVPBody, FeedResponse
@@ -195,6 +195,23 @@ async def save_event(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if event_id.startswith("activity:"):
+        activity_id = event_id.removeprefix("activity:")
+        activity = await db.execute(select(ActivityPost).where(ActivityPost.id == activity_id))
+        if not activity.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail="Activity not found")
+
+        existing = await db.execute(
+            select(SavedEvent).where(
+                SavedEvent.user_id == current_user.id,
+                SavedEvent.activity_id == activity_id,
+            )
+        )
+        if not existing.scalar_one_or_none():
+            db.add(SavedEvent(user_id=current_user.id, activity_id=activity_id))
+            await db.commit()
+        return {}
+
     event = await db.execute(select(Event).where(Event.id == event_id))
     if not event.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Event not found")
@@ -217,6 +234,20 @@ async def unsave_event(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if event_id.startswith("activity:"):
+        activity_id = event_id.removeprefix("activity:")
+        existing = await db.execute(
+            select(SavedEvent).where(
+                SavedEvent.user_id == current_user.id,
+                SavedEvent.activity_id == activity_id,
+            )
+        )
+        saved = existing.scalar_one_or_none()
+        if saved:
+            await db.delete(saved)
+            await db.commit()
+        return {}
+
     existing = await db.execute(
         select(SavedEvent).where(
             SavedEvent.user_id == current_user.id,

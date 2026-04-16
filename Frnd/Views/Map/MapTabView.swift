@@ -33,6 +33,7 @@ final class MapViewModel: ObservableObject {
     @Published var events: [Event] = []
     @Published var selectedEvent: Event?
     @Published var isLoading = false
+    @Published var error: String?
     @Published var selectedCategory: EventCategory?
     @Published var selectedTimeFilter: String = "All"
 
@@ -71,6 +72,7 @@ final class MapViewModel: ObservableObject {
     func loadEvents(region: MKCoordinateRegion) async {
         guard !isLoading else { return }
         isLoading = true
+        error = nil
         defer { isLoading = false }
         let span = region.span
         let center = region.center
@@ -82,7 +84,7 @@ final class MapViewModel: ObservableObject {
                 maxLng: center.longitude + span.longitudeDelta / 2
             )
         } catch {
-            if events.isEmpty { events = Event.mockEvents }
+            self.error = error.localizedDescription
         }
     }
 }
@@ -94,12 +96,12 @@ struct MapTabView: View {
     @StateObject private var locationManager = LocationManager()
 
     @State private var position: MapCameraPosition = .region(MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 41.7991, longitude: -87.5876),
-        span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+        center: AppConfig.defaultCoordinate,
+        span: AppConfig.defaultMapSpan
     ))
     @State private var currentRegion = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 41.7991, longitude: -87.5876),
-        span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+        center: AppConfig.defaultCoordinate,
+        span: AppConfig.defaultMapSpan
     )
     @State private var showEventPreview = false
     @State private var loadTask: Task<Void, Never>?
@@ -185,6 +187,19 @@ struct MapTabView: View {
 
                     Spacer()
 
+                    if let error = viewModel.error {
+                        LoadErrorCard(
+                            title: "Map data unavailable",
+                            message: error,
+                            retryTitle: "Reload Map",
+                            retry: {
+                                Task { await viewModel.loadEvents(region: currentRegion) }
+                            }
+                        )
+                        .padding(.horizontal, Spacing.base)
+                        .padding(.bottom, Spacing.base)
+                    }
+
                     if viewModel.isLoading && viewModel.events.isEmpty {
                         ProgressView()
                             .tint(.ember)
@@ -199,6 +214,25 @@ struct MapTabView: View {
                             withAnimation { showEventPreview = false }
                         }
                         .transition(.move(edge: .bottom).combined(with: .opacity))
+                    } else if !viewModel.isLoading, viewModel.filteredEvents.isEmpty, viewModel.error == nil {
+                        VStack(spacing: Spacing.md) {
+                            Text("No events in this area")
+                                .font(.headingSmall)
+                                .foregroundColor(.textPrimary)
+                            Text("Try moving the map or changing a filter.")
+                                .font(.bodyMedium)
+                                .foregroundColor(.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(Spacing.lg)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: Radius.lg))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radius.lg)
+                                .strokeBorder(Color.bgBorder)
+                        )
+                        .padding(.horizontal, Spacing.base)
+                        .padding(.bottom, Spacing.base)
                     }
 
                     Color.clear.frame(height: 88)
@@ -214,11 +248,11 @@ struct MapTabView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         let coord = locationManager.userLocation
-                            ?? CLLocationCoordinate2D(latitude: 41.7991, longitude: -87.5876)
+                            ?? AppConfig.defaultCoordinate
                         withAnimation {
                             position = .region(MKCoordinateRegion(
                                 center: coord,
-                                span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+                                span: AppConfig.defaultMapSpan
                             ))
                         }
                     } label: {
@@ -232,7 +266,7 @@ struct MapTabView: View {
                 if let loc = locationManager.userLocation {
                     position = .region(MKCoordinateRegion(
                         center: loc,
-                        span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+                        span: AppConfig.defaultMapSpan
                     ))
                 }
                 await viewModel.loadEvents(region: currentRegion)
@@ -241,7 +275,7 @@ struct MapTabView: View {
                 guard let loc = locationManager.userLocation else { return }
                 position = .region(MKCoordinateRegion(
                     center: loc,
-                    span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+                    span: AppConfig.defaultMapSpan
                 ))
             }
         }

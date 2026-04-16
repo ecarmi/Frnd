@@ -268,8 +268,12 @@ class SavedEvent(Base):
 
     id: Mapped[str]        = mapped_column(String, primary_key=True, default=new_uuid)
     user_id: Mapped[str]   = mapped_column(ForeignKey("users.id"), nullable=False)
-    event_id: Mapped[str]  = mapped_column(ForeignKey("events.id"), nullable=False)
+    event_id: Mapped[Optional[str]]  = mapped_column(ForeignKey("events.id"), nullable=True)
+    activity_id: Mapped[Optional[str]] = mapped_column(ForeignKey("activity_posts.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    event: Mapped[Optional["Event"]] = relationship()
+    activity: Mapped[Optional["ActivityPost"]] = relationship()
 
 
 class SwipeFeedback(Base):

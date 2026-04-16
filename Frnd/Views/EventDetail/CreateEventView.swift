@@ -209,7 +209,7 @@ struct CreateEventView: View {
                     .font(.captionSmall)
                     .foregroundColor(.red)
             }
-            TextField("Address (e.g. 1212 E 59th St, Chicago, IL)", text: $venueAddress)
+            TextField("Address (street, city, state)", text: $venueAddress)
                 .focused($focusedField, equals: .venueAddress)
                 .foregroundColor(.textPrimary)
                 .onChange(of: venueAddress) { venueAddressError = nil; geocodeError = nil }

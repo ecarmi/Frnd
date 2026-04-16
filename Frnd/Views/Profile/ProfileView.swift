@@ -28,6 +28,8 @@ struct ProfileView: View {
     @State private var showSettings = false
     @State private var showEditName = false
     @State private var selectedTab: ProfileTab = .saved
+    @State private var eventPendingDeletion: Event?
+    @State private var actionError: String?
 
     enum ProfileTab: String, CaseIterable {
         case saved    = "Saved"
@@ -67,6 +69,27 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $showEditName) {
             EditNameSheet()
+        }
+        .alert("Delete Event?", isPresented: Binding(
+            get: { eventPendingDeletion != nil },
+            set: { if !$0 { eventPendingDeletion = nil } }
+        )) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                guard let event = eventPendingDeletion else { return }
+                deleteEvent(event)
+                eventPendingDeletion = nil
+            }
+        } message: {
+            Text("This event will be removed from your profile and anywhere else it appears.")
+        }
+        .alert("Profile Error", isPresented: Binding(
+            get: { actionError != nil },
+            set: { if !$0 { actionError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(actionError ?? "")
         }
         .task { await viewModel.load(savedEventsStore: savedEventsStore) }
     }
@@ -234,12 +257,9 @@ struct ProfileView: View {
                         ForEach(viewModel.myEvents) { event in
                             SearchResultRow(event: event)
                                 .padding(.horizontal, Spacing.base)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                     Button(role: .destructive) {
-                                        Task {
-                                            try? await APIService.shared.deleteEvent(id: event.id)
-                                            viewModel.myEvents.removeAll { $0.id == event.id }
-                                        }
+                                        eventPendingDeletion = event
                                     } label: {
                                         Label("Delete", systemImage: "trash")
                                     }
@@ -266,6 +286,17 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 48)
         .padding(.horizontal, Spacing.xxxl)
+    }
+
+    private func deleteEvent(_ event: Event) {
+        Task {
+            do {
+                try await APIService.shared.deleteEvent(id: event.id)
+                viewModel.myEvents.removeAll { $0.id == event.id }
+            } catch {
+                actionError = error.localizedDescription
+            }
+        }
     }
 }
 
@@ -498,6 +529,9 @@ private struct EditNameSheet: View {
         NavigationStack {
             ZStack {
                 Color.bgPrimary.ignoresSafeArea()
+                    .onTapGesture {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
                 VStack(spacing: Spacing.xl) {
                     TextField("Display name", text: $name)
                         .font(.bodyLarge)

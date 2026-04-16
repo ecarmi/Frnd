@@ -42,7 +42,7 @@ struct EventCardView: View {
                 }
 
                 HStack(spacing: Spacing.sm) {
-                    PillView(text: event.startTime.relativeEventTime, color: .ember)
+                    PillView(text: primaryTimeLabel, color: .ember)
                     if isActivityCard {
                         PillView(text: event.isMembersOnly ? "Members Only" : "Open", color: .teal)
                     } else {
@@ -125,12 +125,9 @@ struct EventCardView: View {
                     .map { $0.name.components(separatedBy: " ").first ?? $0.name }
                     .joined(separator: ", ")
                 let extra = max(0, event.friendsGoing.count - 2)
-                let label: String
-                if isActivityCard {
-                    label = extra > 0 ? "\(names) +\(extra) joined" : "\(names) joined"
-                } else {
-                    label = extra > 0 ? "\(names) +\(extra) going" : "\(names) going"
-                }
+                let label = isActivityCard
+                    ? (extra > 0 ? "\(names) +\(extra) joined" : "\(names) joined")
+                    : (extra > 0 ? "\(names) +\(extra) going" : "\(names) going")
                 Text(label)
                     .font(.captionMedium)
                     .foregroundColor(.textSecondary)
@@ -152,13 +149,11 @@ struct EventCardView: View {
         let isSaved = savedEventsStore.isSaved(event)
 
         return HStack(spacing: 0) {
-            if !isActivityCard {
-                ActionButton(
-                    icon: isSaved ? "bookmark.fill" : "bookmark",
-                    color: isSaved ? .ember : .textTertiary,
-                    action: onSave
-                )
-            }
+            ActionButton(
+                icon: isSaved ? "bookmark.fill" : "bookmark",
+                color: isSaved ? .ember : .textTertiary,
+                action: onSave
+            )
             Spacer()
             ShareLink(item: shareText) {
                 Image(systemName: "paperplane")
@@ -193,6 +188,19 @@ struct EventCardView: View {
             return "\(event.title) in \(event.groupName ?? event.venue.name) on \(event.startTime.formatted(date: .abbreviated, time: .shortened)). Check it out on Frnd."
         }
         return "\(event.title) at \(event.venue.name) on \(event.startTime.formatted(date: .abbreviated, time: .shortened)). Check it out on Frnd."
+    }
+
+    private var primaryTimeLabel: String {
+        guard isActivityCard else { return event.startTime.relativeEventTime }
+
+        let calendar = Calendar.current
+        if calendar.isDateInToday(event.startTime) {
+            return "Tonight, \(event.startTime.formatted(date: .omitted, time: .shortened))"
+        }
+        if calendar.isDateInTomorrow(event.startTime) {
+            return "Tomorrow, \(event.startTime.formatted(date: .omitted, time: .shortened))"
+        }
+        return event.startTime.formatted(date: .abbreviated, time: .shortened)
     }
 }
 

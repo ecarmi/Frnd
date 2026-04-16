@@ -58,8 +58,7 @@ enum APIError: LocalizedError {
 final class APIService: ObservableObject {
     static let shared = APIService()
 
-    // Change to your machine's IP when testing on device, or localhost for simulator
-    private let baseURL = "https://frnd-production.up.railway.app"
+    private let baseURL = AppConfig.apiBaseURL
     private var authToken: String? {
         get { UserDefaults.standard.string(forKey: "auth_token") }
         set { UserDefaults.standard.set(newValue, forKey: "auth_token") }
@@ -524,7 +523,7 @@ final class APIService: ObservableObject {
         location: String?,
         latitude: Double?,
         longitude: Double?,
-        scheduledTime: Date?,
+        scheduledTime: Date,
         maxParticipants: Int?,
         groupId: String?,
         isMembersOnly: Bool?,
@@ -537,7 +536,7 @@ final class APIService: ObservableObject {
             let location: String?
             let latitude: Double?
             let longitude: Double?
-            let scheduled_time: Date?
+            let scheduled_time: Date
             let max_participants: Int?
             let group_id: String?
             let is_members_only: Bool?
@@ -563,7 +562,7 @@ final class APIService: ObservableObject {
         location: String?,
         latitude: Double?,
         longitude: Double?,
-        scheduledTime: Date?,
+        scheduledTime: Date,
         maxParticipants: Int?,
         groupId: String?,
         isMembersOnly: Bool?,
@@ -576,7 +575,7 @@ final class APIService: ObservableObject {
             let location: String?
             let latitude: Double?
             let longitude: Double?
-            let scheduled_time: Date?
+            let scheduled_time: Date
             let max_participants: Int?
             let group_id: String?
             let is_members_only: Bool?

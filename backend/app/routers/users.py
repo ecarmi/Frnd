@@ -4,9 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
-from ..models import User, Friendship, TasteProfile, SavedEvent, Event, RSVP, RSVPStatusEnum
+from ..models import User, Friendship, TasteProfile, SavedEvent, Event, RSVP, RSVPStatusEnum, ActivityPost, ActivityParticipant
 from ..schemas import UserOut, UserUpdate, FriendshipOut, OnboardingBody, EventOut
-from ..services.feed import build_feed_event_out
+from ..services.feed import build_feed_event_out, _build_group_activity_feed_out
 from ..auth import get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -121,14 +121,32 @@ async def get_saved_events(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(Event)
-        .options(selectinload(Event.venue))
-        .join(SavedEvent, SavedEvent.event_id == Event.id)
+        select(SavedEvent)
+        .options(
+            selectinload(SavedEvent.event).selectinload(Event.venue),
+            selectinload(SavedEvent.activity).selectinload(ActivityPost.group),
+            selectinload(SavedEvent.activity).selectinload(ActivityPost.participants).selectinload(ActivityParticipant.user),
+        )
         .where(SavedEvent.user_id == current_user.id)
         .order_by(SavedEvent.created_at.desc())
     )
-    events = result.scalars().all()
-    return [await build_feed_event_out(e, current_user, db) for e in events]
+    saved_rows = result.scalars().all()
+
+    saved_items: list[EventOut] = []
+    for saved in saved_rows:
+        if saved.event is not None:
+            saved_items.append(await build_feed_event_out(saved.event, current_user, db))
+        elif saved.activity is not None and saved.activity.group is not None:
+            saved_items.append(
+                _build_group_activity_feed_out(
+                    saved.activity,
+                    saved.activity.group,
+                    current_user.id,
+                    is_saved=True,
+                )
+            )
+
+    return saved_items
 
 
 @router.get("/me/attended", response_model=list[EventOut])

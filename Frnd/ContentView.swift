@@ -2,13 +2,11 @@ import SwiftUI
 
 struct MainTabView: View {
     @State private var selectedTab: Tab = .feed
-    @State private var joinedPlan: Plan?
-    @State private var joinedGroup: Group?
     @State private var deepLinkError: String?
     @EnvironmentObject var appState: AppState
 
     enum Tab: Int, CaseIterable {
-        case feed, map, plans, search, profile
+        case feed, map, groups, plans, profile
     }
 
     var body: some View {
@@ -20,11 +18,11 @@ struct MainTabView: View {
                 MapTabView()
                     .tag(Tab.map)
 
+                GroupsView()
+                    .tag(Tab.groups)
+
                 PlansView()
                     .tag(Tab.plans)
-
-                SearchView()
-                    .tag(Tab.search)
 
                 ProfileView()
                     .tag(Tab.profile)
@@ -44,12 +42,6 @@ struct MainTabView: View {
                 appState.pendingDeepLink = nil
             }
         }
-        .sheet(item: $joinedPlan) { plan in
-            NavigationStack {
-                PlanDetailView(plan: plan)
-                    .environmentObject(appState)
-            }
-        }
         .alert("Could not join", isPresented: Binding(
             get: { deepLinkError != nil },
             set: { if !$0 { deepLinkError = nil } }
@@ -64,16 +56,16 @@ struct MainTabView: View {
         switch link {
         case .joinGroup(let code):
             do {
-                let group = try await APIService.shared.joinGroup(inviteCode: code)
-                joinedGroup = group
-                selectedTab = .search
+                _ = try await APIService.shared.joinGroup(inviteCode: code)
+                selectedTab = .groups
             } catch {
                 deepLinkError = "Could not join group: \(error.localizedDescription)"
             }
         case .joinPlan(let code):
             do {
-                let plan = try await APIService.shared.joinPlanByCode(code)
-                joinedPlan = plan
+                _ = try await APIService.shared.joinPlanByCode(code)
+                appState.refreshPlansScreen()
+                selectedTab = .plans
             } catch {
                 deepLinkError = "Could not join plan: \(error.localizedDescription)"
             }
@@ -95,8 +87,8 @@ struct CustomTabBar: View {
     private let items: [TabItem] = [
         TabItem(tab: .feed,    icon: "sparkles",        label: "For You"),
         TabItem(tab: .map,     icon: "map.fill",         label: "Map"),
-        TabItem(tab: .plans,   icon: "person.2.fill",    label: "Plans"),
-        TabItem(tab: .search,  icon: "magnifyingglass",  label: "Search"),
+        TabItem(tab: .groups,  icon: "person.3.fill",    label: "Groups"),
+        TabItem(tab: .plans,   icon: "calendar",         label: "Plans"),
         TabItem(tab: .profile, icon: "person.fill",      label: "Profile"),
     ]
 
