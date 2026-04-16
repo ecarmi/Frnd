@@ -177,6 +177,10 @@ async def save_event(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    event = await db.execute(select(Event).where(Event.id == event_id))
+    if not event.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Event not found")
+
     existing = await db.execute(
         select(SavedEvent).where(
             SavedEvent.user_id == current_user.id,

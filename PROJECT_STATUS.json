@@ -7,7 +7,7 @@
     "infrastructure": "Docker Compose (local), Railway (deployment in progress)"
   },
   "last_updated": "2026-04-15",
-  "notes": "Auth migrated from phone/SMS to email-based OTP. Carpooling demoted to future idea. Railway deployed and working. Backend live at frnd-production.up.railway.app. Deployment startup fixed to use start.sh, Alembic DB URL normalization added, and startup DB checks/logging improved. Feed/backend enum coercion issues were cleaned up across the ORM layer. Saved events now sync across feed/detail/profile/plans, event share is wired up, Plans tab now shows saved events plus My Groups/Public Groups, and create-event pricing was simplified to a single price field.",
+  "notes": "Auth migrated from phone/SMS to email-based OTP. Carpooling demoted to future idea. Railway deployed and working. Backend live at frnd-production.up.railway.app. Deployment startup fixed to use start.sh, Alembic DB URL normalization added, and startup DB checks/logging improved. Feed/backend enum coercion issues were cleaned up across the ORM layer. Saved events now sync across feed/detail/profile/plans, event share is wired up as text-only sharing, Plans tab now shows saved events plus a Going section plus My Groups/Public Groups, and create-event pricing was simplified to a single price field. Several UX/product questions remain open around group flows, create-plan requirements, hard-coded city copy, and event metadata breadth.",
 
   "areas": {
 
@@ -17,7 +17,9 @@
         { "id": "pd-1", "status": "done", "title": "Product specification", "notes": "pulse-product-specification.html" },
         { "id": "pd-2", "status": "done", "title": "Design system", "notes": "Color palette, typography, spacing, component library — DesignSystem.swift" },
         { "id": "pd-3", "status": "done", "title": "All core screens designed and built" },
-        { "id": "pd-4", "status": "not_started", "title": "Design review / user testing", "notes": "No real users have seen the app yet" }
+        { "id": "pd-4", "status": "not_started", "title": "Design review / user testing", "notes": "No real users have seen the app yet" },
+        { "id": "pd-5", "status": "incomplete", "title": "Groups UX/product re-analysis", "notes": "Need to re-evaluate how groups should work end-to-end: creation, private vs public discovery, invite code flow, sorting/filtering, and which actions belong in My Groups vs Public Groups." },
+        { "id": "pd-6", "status": "incomplete", "title": "Create Plan product rule for event selection", "notes": "Open product question: should a plan always require a selected event, or should free-form plans be allowed?" }
       ]
     },
 
@@ -29,7 +31,7 @@
         { "id": "ios-c3", "status": "done", "title": "AppState — global auth/session state" },
         { "id": "ios-c4", "status": "done", "title": "Dev bypass (code 000000 when backend unreachable)" },
         { "id": "ios-c5", "status": "not_started", "title": "Local persistence / caching", "notes": "Every launch re-fetches everything. No SwiftData or UserDefaults caching." },
-        { "id": "ios-c6", "status": "not_started", "title": "Push notifications (APNs)", "notes": "No APNs integration. No alerts for plan messages, RSVPs, carpool confirmations." }
+        { "id": "ios-c6", "status": "incomplete", "title": "Push notifications (APNs)", "notes": "Settings UI can request notification permission, but the app does not register for remote notifications or receive live push delivery for plans/events." }
       ]
     },
 
@@ -45,7 +47,7 @@
         { "id": "ios-s7",  "status": "done",        "title": "Create Plan sheet", "notes": "Supports prefilled event flow and selecting from saved events when opened from Plans." },
         { "id": "ios-s8",  "status": "done",        "title": "Profile — saved events, friends list, attended tab", "notes": "Profile stats row removed; saved events still load and now sync with shared bookmark state." },
         { "id": "ios-s9",  "status": "done",        "title": "Groups — list, detail, create, join by invite code", "notes": "Plans area now separates My Groups and Public Groups." },
-        { "id": "ios-s10", "status": "done",        "title": "Activity Posts / LFG — feed, post card with join/leave, create sheet", "notes": "Standalone activity/LFG flow still exists, but the Plans tab was repurposed from LFG to Public Groups." },
+        { "id": "ios-s10", "status": "done",        "title": "Activity Posts — feed, post card with join/leave, create sheet", "notes": "Standalone public activity posting flow still exists, but the Plans tab now focuses on Plans plus My Groups/Public Groups." },
         { "id": "ios-s11", "status": "future",       "title": "Carpool section in Plan Detail — offer ride, request seat", "notes": "Demoted to future idea. UI and API exist but not prioritized." },
         { "id": "ios-s12", "status": "done",        "title": "Invite friends to plan", "notes": "InviteFriendsSheet with multi-select checklist. Calls POST /plans/{id}/invite." },
         { "id": "ios-s13", "status": "incomplete",  "title": "Real-time plan chat", "notes": "WebSocket endpoint exists on backend but iOS uses HTTP only. Messages require manual refresh to appear." },
@@ -55,7 +57,17 @@
         { "id": "ios-s17", "status": "not_started", "title": "Group-scoped events", "notes": "group_id exists on Event model but no UI to create or view group-only events." },
         { "id": "ios-s18", "status": "done",        "title": "Attended events in Profile", "notes": "Backend GET /users/me/attended (past RSVPs with status=going) + ProfileViewModel.fetchAttendedEvents() wired up." },
         { "id": "ios-s19", "status": "done", "title": "Settings screen", "notes": "Notifications toggle (requests permission), Location status, Privacy Policy sheet, Help link, Sign Out. Spotify removed." },
-        { "id": "ios-s20", "status": "incomplete", "title": "Error/failure states", "notes": "Some actions now surface backend failures during creation flows, but most API errors are still swallowed and feed can still fall back silently." }
+        { "id": "ios-s20", "status": "incomplete", "title": "Error/failure states", "notes": "Some actions now surface backend failures during creation flows, but most API errors are still swallowed and feed can still fall back silently." },
+        { "id": "ios-s21", "status": "done", "title": "Profile stats row removed", "notes": "Attended / saved / friends counts were removed from the profile header." },
+        { "id": "ios-s22", "status": "done", "title": "Event share action", "notes": "Share/send arrow now opens a system share sheet with text-only event details. No deep link or rich card yet." },
+        { "id": "ios-s23", "status": "incomplete", "title": "Create Event field alignment review", "notes": "Event title inline validation is in place, but title/description/venue/address alignment still needs visual QA and possible spacing cleanup." },
+        { "id": "ios-s24", "status": "incomplete", "title": "Public Groups UX parity", "notes": "Public Groups has a top-right plus menu, but join-via-code behavior needs validation against private group invite codes and there is no sorting/filtering UI for large public-group lists." },
+        { "id": "ios-s25", "status": "incomplete", "title": "Hard-coded city/location copy cleanup", "notes": "Feed and fallback locations still include hard-coded Chicago / Hyde Park copy and coordinates in several places." },
+        { "id": "ios-s26", "status": "not_started", "title": "Event audience classification (University / External)", "notes": "Events do not currently expose a University vs External field in the model or UI." },
+        { "id": "ios-s27", "status": "incomplete", "title": "Map handling for overlapping events", "notes": "Map currently renders one annotation per event. There is no clustering, stacking, or multi-event venue expansion when multiple events share a location." },
+        { "id": "ios-s28", "status": "not_started", "title": "Edit activities you created", "notes": "Activities can be created and joined, but there is no edit/update flow for the creator." },
+        { "id": "ios-s29", "status": "incomplete", "title": "Tag activities with groups you administer", "notes": "Activity creation can already link to one of your groups, but there is no admin/owner-only restriction and no dedicated management UX around that linkage." },
+        { "id": "ios-s30", "status": "done", "title": "Verification code input limited to 6 digits", "notes": "OTP entry is digits-only and truncated to six characters in OnboardingView." }
       ]
     },
 
@@ -71,7 +83,7 @@
         { "id": "be-c7", "status": "done",        "title": "Seed script with Chicago test data", "notes": "Updated to use email-based users. Primary test user: ecarmi@uchicago.edu" },
         { "id": "be-c8", "status": "done",        "title": "Dev OTP bypass (code 000000)", "notes": "iOS bypasses OTP locally in DEBUG builds. Backend also accepts 000000 in dev." },
         { "id": "be-c9", "status": "done",        "title": "Database migrations (Alembic)", "notes": "alembic.ini + env.py (async) + full initial migration 0001_initial_schema.py. Railway Postgres URL normalization added so Alembic and runtime engine use compatible async URLs. Run: cd backend && alembic upgrade head" },
-        { "id": "be-c10","status": "not_started", "title": "Rate limiting", "notes": "OTP endpoint is especially exposed. No slowdown/lockout on repeated attempts." },
+        { "id": "be-c10","status": "not_started", "title": "Rate limiting", "notes": "OTP/email verification endpoints are especially exposed. There is currently no limit on how many times a user can request an email code." },
         { "id": "be-c11","status": "not_started", "title": "Background task queue", "notes": "No Celery/ARQ worker. Things like OTP cleanup, taste profile updates run inline or not at all." },
         { "id": "be-c12","status": "not_started", "title": "Redis pub/sub for real-time chat", "notes": "WebSocket uses in-memory dict. Doesn't work across multiple API instances." }
       ]
@@ -82,10 +94,10 @@
       "items": [
         { "id": "be-f1", "status": "not_started", "title": "Event ingestion pipeline", "notes": "No real events beyond seed data. Needs Ticketmaster/Eventbrite/etc. integration or admin upload flow." },
         { "id": "be-f2", "status": "not_started", "title": "Full-text event search", "notes": "Current search is SQL LIKE. No Postgres tsvector or external search engine." },
-        { "id": "be-f3", "status": "not_started", "title": "Taste profile updates from swipes", "notes": "Swipes are recorded in feedback table but taste profile vector is never updated from them. Profile screen currently shows 'Complete your vibe selection' placeholder — MUST remove sample data and wire real taste profile before launch." },
+        { "id": "be-f3", "status": "incomplete", "title": "Taste profile", "notes": "Onboarding writes initial vibe-derived affinities, but swipe feedback does not update the profile over time and the Profile screen still falls back to a placeholder state in some cases." },
         { "id": "be-f4", "status": "not_started", "title": "Image upload / storage", "notes": "No upload endpoint. No S3/Cloudflare R2 integration." },
         { "id": "be-f5", "status": "not_started", "title": "Twilio SMS integration", "notes": "Code path exists but Twilio credentials not configured. OTP only prints to console." },
-        { "id": "be-f6", "status": "not_started", "title": "Push notification delivery", "notes": "No APNs/Firebase integration on backend side." },
+        { "id": "be-f6", "status": "not_started", "title": "Push notification delivery", "notes": "No APNs/Firebase integration on backend side, so notification permission alone does not produce actual pushes." },
         { "id": "be-f7", "status": "not_started", "title": "Admin panel / event moderation", "notes": "No way to manage events, users, or reported content without direct DB access." },
         { "id": "be-f8", "status": "done",  "title": "Backend bug fixes", "notes": "Fixed: Group.memberships→Group.members, feed geo query, MissingGreenlet on taste_profile lazy load in auth/onboarding/groups/plans, Railway startup blocking on migrations, and enum/string mismatches via ORM enum coercion helpers/types." },
         { "id": "be-f9", "status": "not_started", "title": "N+1 query optimization", "notes": "Groups and plans load slowly due to per-member queries. Needs batch loading review." },

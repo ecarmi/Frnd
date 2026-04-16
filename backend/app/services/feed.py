@@ -249,7 +249,8 @@ async def build_feed_event_out(
     user: User,
     db: AsyncSession,
 ) -> EventOut:
-    # Batch: fetch saved + user RSVP + total interested in parallel via a single combined query
+    # Load all RSVP state for this event so detail/saved/plan screens get the same
+    # social payload shape as the main feed.
     rows = await db.execute(
         select(RSVP.event_id, RSVP.user_id, RSVP.status).where(
             RSVP.event_id == event.id,
@@ -259,11 +260,13 @@ async def build_feed_event_out(
 
     my_rsvp_status = None
     total = 0
+    friend_status_by_id: dict[str, str] = {}
     for _, uid, status in all_rsvps:
         if uid == user.id:
             my_rsvp_status = status
         if enum_equals(status, RSVPStatusEnum.going) or enum_equals(status, RSVPStatusEnum.interested):
             total += 1
+            friend_status_by_id[uid] = status
 
     saved_result = await db.execute(
         select(SavedEvent.event_id).where(
@@ -272,6 +275,41 @@ async def build_feed_event_out(
         )
     )
     is_saved = saved_result.scalar_one_or_none() is not None
+
+    friendships_result = await db.execute(
+        select(Friendship).where(
+            or_(Friendship.user_a_id == user.id, Friendship.user_b_id == user.id)
+        )
+    )
+    friend_ids: set[str] = set()
+    for friendship in friendships_result.scalars().all():
+        other_id = friendship.user_b_id if friendship.user_a_id == user.id else friendship.user_a_id
+        if other_id in friend_status_by_id:
+            friend_ids.add(other_id)
+
+    friend_users: dict[str, User] = {}
+    if friend_ids:
+        users_result = await db.execute(
+            select(User)
+            .options(selectinload(User.taste_profile))
+            .where(User.id.in_(friend_ids))
+        )
+        for friend in users_result.scalars().all():
+            friend_users[friend.id] = friend
+
+    friends_going_models: list[User] = []
+    friends_interested_models: list[User] = []
+    for uid, status in friend_status_by_id.items():
+        friend = friend_users.get(uid)
+        if not friend:
+            continue
+        if enum_equals(status, RSVPStatusEnum.going):
+            friends_going_models.append(friend)
+        elif enum_equals(status, RSVPStatusEnum.interested):
+            friends_interested_models.append(friend)
+
+    friends_going = [UserOut.model_validate(friend) for friend in friends_going_models]
+    friends_interested = [UserOut.model_validate(friend) for friend in friends_interested_models]
 
     return EventOut(
         id=event.id,
@@ -289,7 +327,10 @@ async def build_feed_event_out(
         source=event.source,
         creator_id=event.creator_id,
         trending_score=event.trending_score or 0.0,
+        friends_going=friends_going,
+        friends_interested=friends_interested,
         total_interested=total,
         user_rsvp_status=my_rsvp_status,
+        ai_reason_chip=_ai_reason(event, friends_going_models, user),
         is_saved=is_saved,
     )

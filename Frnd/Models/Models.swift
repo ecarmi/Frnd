@@ -9,6 +9,8 @@ enum EventCategory: String, Codable, CaseIterable {
     case foodDrink = "food_drink"
     case arts      = "arts"
     case sports    = "sports"
+    case speaker   = "speaker"
+    case networking = "networking"
     case other     = "other"
 
     var displayName: String {
@@ -18,6 +20,8 @@ enum EventCategory: String, Codable, CaseIterable {
         case .foodDrink: return "Food & Drink"
         case .arts:      return "Arts & Culture"
         case .sports:    return "Sports & Outdoors"
+        case .speaker:   return "Speaker Event"
+        case .networking: return "Networking"
         case .other:     return "Other"
         }
     }
@@ -29,6 +33,8 @@ enum EventCategory: String, Codable, CaseIterable {
         case .foodDrink: return "🍻"
         case .arts:      return "🎨"
         case .sports:    return "🏃"
+        case .speaker:   return "🎤"
+        case .networking: return "🤝"
         case .other:     return "✨"
         }
     }

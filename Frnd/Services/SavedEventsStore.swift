@@ -7,11 +7,19 @@ final class SavedEventsStore: ObservableObject {
 
     @Published private(set) var savedEvents: [Event] = []
     @Published private(set) var savedEventIDs: Set<String> = []
+    private var localOverrides: [String: Bool] = [:]
+    private var hasServerSnapshot = false
 
     private init() {}
 
     func isSaved(_ event: Event) -> Bool {
-        savedEventIDs.contains(event.id) || event.isSaved
+        if let override = localOverrides[event.id] {
+            return override
+        }
+        if hasServerSnapshot {
+            return savedEventIDs.contains(event.id)
+        }
+        return savedEventIDs.contains(event.id) || event.isSaved
     }
 
     func bootstrap(from events: [Event]) {
@@ -28,6 +36,8 @@ final class SavedEventsStore: ObservableObject {
         }
         savedEvents = normalized
         savedEventIDs = Set(normalized.map(\.id))
+        localOverrides.removeAll()
+        hasServerSnapshot = true
     }
 
     func toggle(event: Event) async throws {
@@ -47,6 +57,7 @@ final class SavedEventsStore: ObservableObject {
     }
 
     func setSaved(event: Event, isSaved: Bool) {
+        localOverrides[event.id] = isSaved
         if isSaved {
             upsertSavedEvent(event)
         } else {

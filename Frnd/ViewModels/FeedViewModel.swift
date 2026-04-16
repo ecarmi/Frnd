@@ -68,12 +68,22 @@ final class FeedViewModel: ObservableObject {
 
     func rsvp(eventId: String, status: RSVPStatus) async {
         guard let index = events.firstIndex(where: { $0.id == eventId }) else { return }
+        let previousStatus = events[index].userRSVPStatus
         events[index].userRSVPStatus = status
+
         do {
             let rsvp = try await APIService.shared.rsvp(eventId: eventId, status: status)
             if let idx = events.firstIndex(where: { $0.id == eventId }) {
                 events[idx].userRSVPStatus = rsvp.status
             }
-        } catch {}
+            if let refreshed = try? await APIService.shared.fetchEvent(id: eventId),
+               let idx = events.firstIndex(where: { $0.id == eventId }) {
+                events[idx] = refreshed
+            }
+        } catch {
+            if let idx = events.firstIndex(where: { $0.id == eventId }) {
+                events[idx].userRSVPStatus = previousStatus
+            }
+        }
     }
 }

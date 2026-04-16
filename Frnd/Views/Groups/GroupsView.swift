@@ -188,6 +188,12 @@ struct GroupDetailView: View {
     @State private var showCreateActivity = false
     @State private var showCreateEvent = false
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var appState: AppState
+
+    private var isMember: Bool {
+        guard let currentUserId = appState.currentUser?.id else { return false }
+        return group.members.contains { $0.userId == currentUserId }
+    }
 
     var body: some View {
         ZStack {
@@ -197,8 +203,8 @@ struct GroupDetailView: View {
                     // Header
                     headerSection
 
-                    // Invite code (owner)
-                    if let code = group.inviteCode {
+                    // Invite code (member)
+                    if isMember, let code = group.inviteCode {
                         inviteCodeSection(code)
                     }
 
@@ -218,19 +224,21 @@ struct GroupDetailView: View {
                     .font(.headingMedium)
                     .foregroundColor(.textPrimary)
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("Post Event") { showCreateEvent = true }
-                    Button("Post Activity") { showCreateActivity = true }
-                    Button("Leave Group", role: .destructive) {
-                        Task {
-                            try? await viewModel.leaveGroup(id: group.id)
-                            dismiss()
+            if isMember {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button("Post Event") { showCreateEvent = true }
+                        Button("Post Activity") { showCreateActivity = true }
+                        Button("Leave Group", role: .destructive) {
+                            Task {
+                                try? await viewModel.leaveGroup(id: group.id)
+                                dismiss()
+                            }
                         }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundColor(.textSecondary)
                     }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .foregroundColor(.textSecondary)
                 }
             }
         }
@@ -286,11 +294,14 @@ struct GroupDetailView: View {
                 .tracking(2)
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
+                    Text(code)
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundColor(.textPrimary)
                     Text("frnd://join/group/\(code)")
                         .font(.system(.caption, design: .monospaced))
                         .foregroundColor(.teal)
                         .lineLimit(1)
-                    Text("Share this link to invite anyone")
+                    Text("Share the link or send the code directly")
                         .font(.captionSmall)
                         .foregroundColor(.textTertiary)
                 }
@@ -345,9 +356,11 @@ struct GroupDetailView: View {
                     .textCase(.uppercase)
                     .tracking(2)
                 Spacer()
-                Button("Post") { showCreateActivity = true }
-                    .font(.captionMedium)
-                    .foregroundColor(.ember)
+                if isMember {
+                    Button("Post") { showCreateActivity = true }
+                        .font(.captionMedium)
+                        .foregroundColor(.ember)
+                }
             }
             if loadingActivities {
                 ProgressView().tint(.ember)
@@ -416,6 +429,7 @@ struct CreateGroupSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Create") {
                         Task {
+                            error = nil
                             guard !name.trimmingCharacters(in: .whitespaces).isEmpty else {
                                 error = "Name is required"
                                 return
@@ -431,7 +445,7 @@ struct CreateGroupSheet: View {
                         }
                     }
                     .foregroundColor(.ember)
-                    .disabled(name.isEmpty || isLoading)
+                    .disabled(isLoading)
                 }
             }
         }
@@ -457,7 +471,7 @@ struct JoinGroupSheet: View {
                     Text("Enter Invite Code")
                         .font(.headingMedium)
                         .foregroundColor(.textPrimary)
-                    TextField("Invite code", text: $inviteCode)
+                    TextField("Invite code or frnd:// link", text: $inviteCode)
                         .font(.system(.title3, design: .monospaced))
                         .foregroundColor(.teal)
                         .multilineTextAlignment(.center)
@@ -470,9 +484,15 @@ struct JoinGroupSheet: View {
                     }
                     Button("Join") {
                         Task {
+                            error = nil
+                            let trimmedCode = inviteCode.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !trimmedCode.isEmpty else {
+                                error = "Invite code is required"
+                                return
+                            }
                             isLoading = true
                             do {
-                                try await viewModel.joinGroup(inviteCode: inviteCode.trimmingCharacters(in: .whitespaces))
+                                try await viewModel.joinGroup(inviteCode: trimmedCode)
                                 dismiss()
                             } catch {
                                 self.error = error.localizedDescription
@@ -481,7 +501,7 @@ struct JoinGroupSheet: View {
                         }
                     }
                     .buttonStyle(PrimaryButtonStyle())
-                    .disabled(inviteCode.isEmpty || isLoading)
+                    .disabled(isLoading)
                 }
                 .padding(Spacing.xl)
             }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CreatePlanView: View {
     let prefillEvent: Event?
+    let onCreated: ((Plan) -> Void)?
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var appState: AppState
     @EnvironmentObject private var savedEventsStore: SavedEventsStore
@@ -13,8 +14,9 @@ struct CreatePlanView: View {
     @State private var savedEvents: [Event] = []
     @State private var errorMessage: String?
 
-    init(prefillEvent: Event?) {
+    init(prefillEvent: Event?, onCreated: ((Plan) -> Void)? = nil) {
         self.prefillEvent = prefillEvent
+        self.onCreated = onCreated
         if let event = prefillEvent {
             _title = State(initialValue: event.title)
             _selectedEventIds = State(initialValue: [event.id])
@@ -121,7 +123,7 @@ struct CreatePlanView: View {
                             }
                         }
                         .buttonStyle(PrimaryButtonStyle())
-                        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
+                        .disabled(isLoading)
 
                         Color.clear.frame(height: 40)
                     }
@@ -147,15 +149,23 @@ struct CreatePlanView: View {
     }
 
     private func createPlan() {
+        errorMessage = nil
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else {
+            errorMessage = "Plan name is required."
+            return
+        }
+
         isLoading = true
         Task {
             defer { isLoading = false }
             do {
-                _ = try await APIService.shared.createPlan(
-                    title: title.trimmingCharacters(in: .whitespaces),
+                let plan = try await APIService.shared.createPlan(
+                    title: trimmedTitle,
                     eventIds: Array(selectedEventIds),
                     inviteeIds: Array(inviteeIds)
                 )
+                onCreated?(plan)
                 dismiss()
             } catch {
                 errorMessage = error.localizedDescription
@@ -165,14 +175,14 @@ struct CreatePlanView: View {
 
     private var savedEventsSection: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            Text("Saved Events")
+            Text("Saved Events (Optional)")
                 .font(.mono)
                 .foregroundColor(.textTertiary)
                 .textCase(.uppercase)
                 .tracking(1.5)
 
             if savedEvents.isEmpty {
-                Text("Bookmark events from the feed, then start a plan around them here.")
+                Text("You can create a plan without an event, or bookmark one from the feed and attach it here.")
                     .font(.bodyMedium)
                     .foregroundColor(.textSecondary)
                     .padding(Spacing.base)

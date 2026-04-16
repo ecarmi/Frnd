@@ -2,7 +2,7 @@ import SwiftUI
 import MapKit
 
 struct EventDetailView: View {
-    let event: Event
+    @State private var event: Event
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var savedEventsStore: SavedEventsStore
     @State private var rsvpStatus: RSVPStatus?
@@ -10,7 +10,7 @@ struct EventDetailView: View {
     @State private var isRSVPLoading = false
 
     init(event: Event) {
-        self.event = event
+        _event = State(initialValue: event)
         _rsvpStatus = State(initialValue: event.userRSVPStatus)
     }
 
@@ -112,6 +112,9 @@ struct EventDetailView: View {
         .ignoresSafeArea(edges: .top)
         .sheet(isPresented: $showCreatePlan) {
             CreatePlanView(prefillEvent: event)
+        }
+        .task {
+            await refreshEvent()
         }
     }
 
@@ -257,18 +260,32 @@ struct EventDetailView: View {
     }
 
     private func toggleRSVP() {
+        guard !isRSVPLoading else { return }
+
         isRSVPLoading = true
+        let previousStatus = rsvpStatus
         let newStatus: RSVPStatus = rsvpStatus == .going ? .interested : .going
+        rsvpStatus = newStatus
+        event.userRSVPStatus = newStatus
+
         Task {
             defer { isRSVPLoading = false }
             do {
                 let rsvp = try await APIService.shared.rsvp(eventId: event.id, status: newStatus)
                 rsvpStatus = rsvp.status
+                event.userRSVPStatus = rsvp.status
+                await refreshEvent()
             } catch {
-                // Optimistic update fallback
-                rsvpStatus = newStatus
+                rsvpStatus = previousStatus
+                event.userRSVPStatus = previousStatus
             }
         }
+    }
+
+    private func refreshEvent() async {
+        guard let refreshed = try? await APIService.shared.fetchEvent(id: event.id) else { return }
+        event = refreshed
+        rsvpStatus = refreshed.userRSVPStatus
     }
 
     // MARK: - Venue Section

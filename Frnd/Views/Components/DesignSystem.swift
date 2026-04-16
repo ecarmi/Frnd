@@ -29,6 +29,8 @@ extension Color {
         case .foodDrink:   return .gold
         case .arts:        return .rose
         case .sports:      return .teal
+        case .speaker:     return .violet
+        case .networking:  return .gold
         case .other:       return .textSecondary
         }
     }

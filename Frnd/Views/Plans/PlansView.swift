@@ -4,23 +4,30 @@ import Combine
 @MainActor
 final class PlansViewModel: ObservableObject {
     @Published var plans: [Plan] = []
+    @Published var goingEvents: [Event] = []
     @Published var isLoading = false
     @Published var error: String?
 
     func loadPlans() async {
         isLoading = true
         defer { isLoading = false }
-        do {
-            plans = try await APIService.shared.fetchMyPlans()
-        } catch {
-            plans = Plan.mockPlans
-        }
+        let fetchedPlans = (try? await APIService.shared.fetchMyPlans()) ?? []
+        let upcomingGoing = (try? await APIService.shared.fetchGoingEvents()) ?? []
+
+        plans = fetchedPlans
+        let plannedEventIDs = Set(fetchedPlans.flatMap(\.eventOptions).map(\.id))
+        goingEvents = upcomingGoing.filter { !plannedEventIDs.contains($0.id) }
     }
 
     func createPlan(title: String, eventIds: [String], inviteeIds: [String]) async throws -> Plan {
         let plan = try await APIService.shared.createPlan(title: title, eventIds: eventIds, inviteeIds: inviteeIds)
-        plans.insert(plan, at: 0)
+        insertOrUpdate(plan)
         return plan
+    }
+
+    func insertOrUpdate(_ plan: Plan) {
+        plans.removeAll { $0.id == plan.id }
+        plans.insert(plan, at: 0)
     }
 }
 
@@ -38,6 +45,7 @@ final class PublicGroupsViewModel: ObservableObject {
 
 struct PlansView: View {
     @StateObject private var viewModel = PlansViewModel()
+    @StateObject private var groupsViewModel = GroupsViewModel()
     @StateObject private var publicGroupsViewModel = PublicGroupsViewModel()
     @EnvironmentObject private var savedEventsStore: SavedEventsStore
     @State private var showCreatePlan = false
@@ -49,6 +57,9 @@ struct PlansView: View {
 
     private var activePlans: [Plan] { viewModel.plans.filter { $0.status != .archived } }
     private var pastPlans:   [Plan] { viewModel.plans.filter { $0.status == .archived } }
+    private var hasPlanTabContent: Bool {
+        !savedEventsStore.savedEvents.isEmpty || !viewModel.goingEvents.isEmpty || !viewModel.plans.isEmpty
+    }
 
     var body: some View {
         NavigationStack {
@@ -66,15 +77,22 @@ struct PlansView: View {
                     case 0:
                         if viewModel.isLoading && viewModel.plans.isEmpty {
                             ProgressView().tint(.ember).frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else if viewModel.plans.isEmpty {
+                        } else if !hasPlanTabContent {
                             emptyState.frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else {
                             plansList
                         }
                     case 1:
-                        GroupsViewEmbedded(showCreate: $showCreateGroup, showJoin: $showJoinGroup)
+                        GroupsViewEmbedded(
+                            viewModel: groupsViewModel,
+                            showCreate: $showCreateGroup,
+                            showJoin: $showJoinGroup
+                        )
                     case 2:
-                        PublicGroupsViewEmbedded(viewModel: publicGroupsViewModel)
+                        PublicGroupsViewEmbedded(
+                            viewModel: publicGroupsViewModel,
+                            groupsViewModel: groupsViewModel
+                        )
                     default:
                         EmptyView()
                     }
@@ -88,7 +106,7 @@ struct PlansView: View {
                         .foregroundColor(.textPrimary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    if selectedSegment == 1 {
+                    if selectedSegment == 1 || selectedSegment == 2 {
                         Menu {
                             Button("Create Group") { showCreateGroup = true }
                             Button("Join via Code") { showJoinGroup = true }
@@ -103,24 +121,35 @@ struct PlansView: View {
                             Image(systemName: "plus")
                                 .foregroundColor(.ember)
                         }
-                        .opacity(selectedSegment == 0 ? 1 : 0)
-                        .disabled(selectedSegment != 0)
                     }
                 }
             }
         }
         .sheet(isPresented: $showCreatePlan, onDismiss: {
             prefillEvent = nil
-            Task { await viewModel.loadPlans() }
+            Task { await refreshPlansData() }
         }) {
-            CreatePlanView(prefillEvent: prefillEvent)
+            CreatePlanView(prefillEvent: prefillEvent) { createdPlan in
+                viewModel.insertOrUpdate(createdPlan)
+            }
         }
-        .task {
-            await viewModel.loadPlans()
-            await publicGroupsViewModel.load()
-            let savedEvents = (try? await APIService.shared.fetchSavedEvents()) ?? savedEventsStore.savedEvents
-            savedEventsStore.replaceSavedEvents(savedEvents)
+        .sheet(isPresented: $showCreateGroup) {
+            CreateGroupSheet(viewModel: groupsViewModel)
         }
+        .sheet(isPresented: $showJoinGroup) {
+            JoinGroupSheet(viewModel: groupsViewModel)
+        }
+        .onAppear {
+            Task { await refreshPlansData() }
+        }
+    }
+
+    private func refreshPlansData() async {
+        await viewModel.loadPlans()
+        await groupsViewModel.load()
+        await publicGroupsViewModel.load()
+        let savedEvents = (try? await APIService.shared.fetchSavedEvents()) ?? savedEventsStore.savedEvents
+        savedEventsStore.replaceSavedEvents(savedEvents)
     }
 
     private var segmentPicker: some View {
@@ -153,7 +182,17 @@ struct PlansView: View {
                 if !savedEventsStore.savedEvents.isEmpty {
                     sectionHeader("Saved Events", count: savedEventsStore.savedEvents.count)
                     ForEach(savedEventsStore.savedEvents.prefix(4)) { event in
-                        SavedEventPlanRow(event: event) {
+                        EventPlanRow(event: event) {
+                            prefillEvent = event
+                            showCreatePlan = true
+                        }
+                    }
+                }
+
+                if !viewModel.goingEvents.isEmpty {
+                    sectionHeader("Going", count: viewModel.goingEvents.count)
+                    ForEach(viewModel.goingEvents.prefix(6)) { event in
+                        EventPlanRow(event: event) {
                             prefillEvent = event
                             showCreatePlan = true
                         }
@@ -214,7 +253,7 @@ struct PlansView: View {
             Text("No plans yet")
                 .font(.headingMedium)
                 .foregroundColor(.textPrimary)
-            Text("Create a plan around an event and invite your crew.")
+            Text("Create a plan with or without an event and invite your crew.")
                 .font(.bodyMedium)
                 .foregroundColor(.textSecondary)
                 .multilineTextAlignment(.center)
@@ -226,7 +265,7 @@ struct PlansView: View {
     }
 }
 
-private struct SavedEventPlanRow: View {
+private struct EventPlanRow: View {
     let event: Event
     let onStartPlan: () -> Void
 
@@ -354,7 +393,7 @@ struct PlanRowView: View {
 // MARK: - Embedded wrappers (no NavigationStack, inherits parent)
 
 struct GroupsViewEmbedded: View {
-    @StateObject private var viewModel = GroupsViewModel()
+    @ObservedObject var viewModel: GroupsViewModel
     @Binding var showCreate: Bool
     @Binding var showJoin: Bool
 
@@ -394,14 +433,48 @@ struct GroupsViewEmbedded: View {
                 }
             }
         }
-        .sheet(isPresented: $showCreate) { CreateGroupSheet(viewModel: viewModel) }
-        .sheet(isPresented: $showJoin) { JoinGroupSheet(viewModel: viewModel) }
         .task { await viewModel.load() }
     }
 }
 
 struct PublicGroupsViewEmbedded: View {
     @ObservedObject var viewModel: PublicGroupsViewModel
+    @ObservedObject var groupsViewModel: GroupsViewModel
+    @State private var searchText = ""
+    @State private var sortOption: PublicGroupSort = .mostMembers
+
+    private enum PublicGroupSort: String, CaseIterable, Identifiable {
+        case mostMembers = "Most Members"
+        case newest = "Newest"
+        case name = "Name"
+
+        var id: String { rawValue }
+    }
+
+    private var displayedGroups: [Group] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filtered = viewModel.groups.filter { group in
+            guard !query.isEmpty else { return true }
+            return group.name.localizedCaseInsensitiveContains(query) ||
+                group.description.localizedCaseInsensitiveContains(query)
+        }
+
+        switch sortOption {
+        case .mostMembers:
+            return filtered.sorted {
+                if $0.memberCount == $1.memberCount {
+                    return $0.createdAt > $1.createdAt
+                }
+                return $0.memberCount > $1.memberCount
+            }
+        case .newest:
+            return filtered.sorted { $0.createdAt > $1.createdAt }
+        case .name:
+            return filtered.sorted {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -417,8 +490,62 @@ struct PublicGroupsViewEmbedded: View {
             } else {
                 ScrollView(showsIndicators: false) {
                     LazyVStack(spacing: Spacing.base) {
-                        ForEach(viewModel.groups) { group in
-                            GroupRowView(group: group)
+                        VStack(spacing: Spacing.sm) {
+                            HStack(spacing: Spacing.sm) {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundColor(.textTertiary)
+                                TextField("Search public groups", text: $searchText)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                    .foregroundColor(.textPrimary)
+                            }
+                            .padding(.horizontal, Spacing.md)
+                            .padding(.vertical, Spacing.sm)
+                            .background(Color.bgRaised)
+                            .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+                            .overlay(RoundedRectangle(cornerRadius: Radius.md).strokeBorder(Color.bgBorder))
+
+                            HStack {
+                                Text("\(displayedGroups.count) groups")
+                                    .font(.captionMedium)
+                                    .foregroundColor(.textSecondary)
+                                Spacer()
+                                Menu {
+                                    ForEach(PublicGroupSort.allCases) { option in
+                                        Button(option.rawValue) {
+                                            sortOption = option
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Text(sortOption.rawValue)
+                                            .font(.captionMedium)
+                                        Image(systemName: "arrow.up.arrow.down")
+                                            .font(.captionSmall)
+                                    }
+                                    .foregroundColor(.ember)
+                                }
+                            }
+                        }
+
+                        if displayedGroups.isEmpty {
+                            VStack(spacing: Spacing.sm) {
+                                Text("No matching groups")
+                                    .font(.headingSmall)
+                                    .foregroundColor(.textPrimary)
+                                Text("Try a different search or sort.")
+                                    .font(.captionMedium)
+                                    .foregroundColor(.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Spacing.xl)
+                        }
+
+                        ForEach(displayedGroups) { group in
+                            NavigationLink(destination: GroupDetailView(group: group, viewModel: groupsViewModel)) {
+                                GroupRowView(group: group)
+                            }
+                            .buttonStyle(.plain)
                         }
                         Color.clear.frame(height: 88)
                     }

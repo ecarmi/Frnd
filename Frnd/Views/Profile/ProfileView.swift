@@ -5,7 +5,6 @@ import CoreLocation
 
 @MainActor
 final class ProfileViewModel: ObservableObject {
-    @Published var savedEvents: [Event] = []
     @Published var attendedEvents: [Event] = []
     @Published var myEvents: [Event] = []
     @Published var friends: [Friendship] = []
@@ -19,8 +18,7 @@ final class ProfileViewModel: ObservableObject {
         async let attendedResult = try? APIService.shared.fetchAttendedEvents()
         async let myEventsResult = try? APIService.shared.fetchMyCreatedEvents()
         friends = (await friendsResult) ?? []
-        savedEvents = (await savedResult) ?? []
-        savedEventsStore.replaceSavedEvents(savedEvents)
+        savedEventsStore.replaceSavedEvents((await savedResult) ?? savedEventsStore.savedEvents)
         attendedEvents = (await attendedResult) ?? []
         myEvents = (await myEventsResult) ?? []
     }
@@ -209,11 +207,11 @@ struct ProfileView: View {
         SwiftUI.Group {
             switch selectedTab {
             case .saved:
-                if viewModel.savedEvents.isEmpty {
+                if savedEventsStore.savedEvents.isEmpty {
                     emptyTabState(icon: "bookmark", message: "Events you save will appear here")
                 } else {
                     LazyVStack(spacing: Spacing.sm) {
-                        ForEach(viewModel.savedEvents) { event in
+                        ForEach(savedEventsStore.savedEvents) { event in
                             SearchResultRow(event: event)
                                 .padding(.horizontal, Spacing.base)
                         }

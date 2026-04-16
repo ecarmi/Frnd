@@ -73,6 +73,7 @@ class AuthResponse(BaseModel):
 
 
 class OnboardingBody(BaseModel):
+    name: Optional[str] = None
     vibe_tag_names: list[str]
 
 

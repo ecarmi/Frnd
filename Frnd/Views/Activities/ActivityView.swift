@@ -310,6 +310,7 @@ struct CreateActivityView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Post") {
                         Task {
+                            error = nil
                             guard !title.trimmingCharacters(in: .whitespaces).isEmpty else {
                                 error = "Title is required"
                                 return
@@ -337,7 +338,7 @@ struct CreateActivityView: View {
                         }
                     }
                     .foregroundColor(.ember)
-                    .disabled(title.isEmpty || isLoading)
+                    .disabled(isLoading)
                 }
             }
         }

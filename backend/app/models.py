@@ -27,6 +27,8 @@ class EventCategoryEnum(str, enum.Enum):
     food_drink = "food_drink"
     arts       = "arts"
     sports     = "sports"
+    speaker    = "speaker"
+    networking = "networking"
     other      = "other"
 
 

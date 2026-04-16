@@ -156,7 +156,10 @@ struct OnboardingView: View {
         Task {
             defer { isLoading = false }
             do {
-                let user = try await APIService.shared.completeOnboarding(vibeTagNames: Array(selectedVibes))
+                let user = try await APIService.shared.completeOnboarding(
+                    name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+                    vibeTagNames: Array(selectedVibes)
+                )
                 appState.setUser(user)
             } catch {
                 errorMessage = error.localizedDescription
@@ -282,6 +285,10 @@ private struct OTPStep: View {
                     .foregroundColor(.textPrimary)
                     .keyboardType(.numberPad)
                     .multilineTextAlignment(.center)
+                    .onChange(of: otp) {
+                        let digitsOnly = otp.filter(\.isNumber)
+                        otp = String(digitsOnly.prefix(6))
+                    }
                     .padding()
                     .background(Color.bgRaised)
                     .clipShape(RoundedRectangle(cornerRadius: Radius.md))

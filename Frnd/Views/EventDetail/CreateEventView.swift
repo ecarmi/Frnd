@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import UIKit
 
 struct CreateEventView: View {
     let groupId: String?
@@ -20,15 +21,22 @@ struct CreateEventView: View {
     @State private var venueName = ""
     @State private var venueAddress = ""
     @State private var hasCapacity = false
-    @State private var capacityText = "50"
+    @State private var capacityText = ""
 
     // State
     @State private var isSubmitting = false
-    @State private var errorMessage: String?
+    @State private var titleError: String?
+    @State private var venueNameError: String?
+    @State private var venueAddressError: String?
     @State private var geocodeError: String?
     @State private var priceError: String?
+    @State private var alertMessage: String?
 
     private enum Field: Hashable {
+        case title
+        case description
+        case venueName
+        case venueAddress
         case price
         case capacity
     }
@@ -45,9 +53,10 @@ struct CreateEventView: View {
                     venueSection
                     capacitySection
                 }
+                .scrollDismissesKeyboard(.immediately)
                 .simultaneousGesture(
                     TapGesture().onEnded {
-                        focusedField = nil
+                        dismissKeyboard()
                     }
                 )
                 .scrollContentBackground(.hidden)
@@ -65,12 +74,7 @@ struct CreateEventView: View {
                     }
                     .foregroundColor(.ember)
                     .fontWeight(.semibold)
-                    .disabled(!isFormValid || isSubmitting)
-                }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { focusedField = nil }
-                        .foregroundColor(.ember)
+                    .disabled(isSubmitting)
                 }
             }
             .overlay {
@@ -79,6 +83,14 @@ struct CreateEventView: View {
                     ProgressView().tint(.white)
                 }
             }
+            .alert("Can't Post Event", isPresented: Binding(
+                get: { alertMessage != nil },
+                set: { if !$0 { alertMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(alertMessage ?? "")
+            }
         }
     }
 
@@ -86,20 +98,35 @@ struct CreateEventView: View {
 
     private var basicSection: some View {
         Section("Event Details") {
-            TextField("Event title", text: $title)
-                .foregroundColor(.textPrimary)
-            ZStack(alignment: .topLeading) {
-                if description.isEmpty {
-                    Text("Description (optional)")
-                        .foregroundColor(.textTertiary)
-                        .padding(.top, 8)
-                        .padding(.leading, 4)
-                }
-                TextEditor(text: $description)
-                    .frame(minHeight: 80)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Event Name")
+                    .font(.captionSmall)
+                    .foregroundColor(.textTertiary)
+                TextField("Event title", text: $title)
+                    .focused($focusedField, equals: .title)
                     .foregroundColor(.textPrimary)
+                    .onChange(of: title) { titleError = nil }
             }
-            if let err = errorMessage {
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Description")
+                    .font(.captionSmall)
+                    .foregroundColor(.textTertiary)
+                ZStack(alignment: .topLeading) {
+                    if description.isEmpty {
+                        Text("Description (optional)")
+                            .foregroundColor(.textTertiary)
+                            .padding(.top, 8)
+                            .padding(.leading, 5)
+                    }
+                    TextEditor(text: $description)
+                        .frame(minHeight: 80)
+                        .focused($focusedField, equals: .description)
+                        .foregroundColor(.textPrimary)
+                        .scrollContentBackground(.hidden)
+                }
+            }
+            if let err = titleError {
                 Text(err)
                     .font(.captionSmall)
                     .foregroundColor(.red)
@@ -109,12 +136,29 @@ struct CreateEventView: View {
 
     private var categorySection: some View {
         Section("Category") {
-            Picker("Category", selection: $category) {
+            Menu {
                 ForEach(EventCategory.allCases, id: \.self) { cat in
-                    Text(cat.displayName).tag(cat)
+                    Button {
+                        category = cat
+                    } label: {
+                        Label(cat.displayName, systemImage: selectedCategorySymbol(for: cat))
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Category")
+                        .foregroundColor(.textPrimary)
+                    Spacer()
+                    HStack(spacing: 8) {
+                        Text(category.emoji)
+                        Text(category.displayName)
+                            .foregroundColor(.textSecondary)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.captionSmall)
+                            .foregroundColor(.textTertiary)
+                    }
                 }
             }
-            .foregroundColor(.textPrimary)
         }
     }
 
@@ -157,10 +201,19 @@ struct CreateEventView: View {
     private var venueSection: some View {
         Section("Venue") {
             TextField("Venue name (e.g. Ida Noyes Hall)", text: $venueName)
+                .focused($focusedField, equals: .venueName)
                 .foregroundColor(.textPrimary)
+                .onChange(of: venueName) { venueNameError = nil }
+            if let err = venueNameError {
+                Text(err)
+                    .font(.captionSmall)
+                    .foregroundColor(.red)
+            }
             TextField("Address (e.g. 1212 E 59th St, Chicago, IL)", text: $venueAddress)
+                .focused($focusedField, equals: .venueAddress)
                 .foregroundColor(.textPrimary)
-            if let err = geocodeError {
+                .onChange(of: venueAddress) { venueAddressError = nil; geocodeError = nil }
+            if let err = venueAddressError ?? geocodeError {
                 Text(err)
                     .font(.captionSmall)
                     .foregroundColor(.red)
@@ -177,7 +230,7 @@ struct CreateEventView: View {
                     Text("Max attendees")
                         .foregroundColor(.textPrimary)
                     Spacer()
-                    TextField("50", text: $capacityText)
+                    TextField("Optional", text: $capacityText)
                         .keyboardType(.numberPad)
                         .focused($focusedField, equals: .capacity)
                         .multilineTextAlignment(.trailing)
@@ -190,20 +243,17 @@ struct CreateEventView: View {
 
     // MARK: - Validation
 
-    private var isFormValid: Bool {
-        !title.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !venueName.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !venueAddress.trimmingCharacters(in: .whitespaces).isEmpty
-    }
-
     private func validateFields() -> String? {
         if title.trimmingCharacters(in: .whitespaces).isEmpty {
+            titleError = "Please enter an event title."
             return "Please enter an event title."
         }
         if venueName.trimmingCharacters(in: .whitespaces).isEmpty {
+            venueNameError = "Please enter a venue name."
             return "Please enter a venue name."
         }
         if venueAddress.trimmingCharacters(in: .whitespaces).isEmpty {
+            venueAddressError = "Please enter the venue address."
             return "Please enter the venue address."
         }
         if isPaid {
@@ -212,19 +262,26 @@ struct CreateEventView: View {
                 return "Fix pricing before posting."
             }
         }
+        if hasCapacity {
+            guard let capacity = Int(capacityText), capacity > 0 else {
+                return "Please enter a valid max attendee count."
+            }
+        }
         return nil
     }
 
     // MARK: - Submit
 
     private func submit() async {
-        focusedField = nil
+        dismissKeyboard()
+        titleError = nil
+        venueNameError = nil
+        venueAddressError = nil
         geocodeError = nil
-        errorMessage = nil
         priceError = nil
 
         if let err = validateFields() {
-            errorMessage = err
+            alertMessage = err
             return
         }
 
@@ -239,14 +296,16 @@ struct CreateEventView: View {
             searchResponse = try await MKLocalSearch(request: searchRequest).start()
         } catch {
             geocodeError = "Address not found. Try a more specific address."
+            alertMessage = geocodeError
             return
         }
 
         guard let mapItem = searchResponse.mapItems.first else {
             geocodeError = "Could not determine coordinates for that address."
+            alertMessage = geocodeError
             return
         }
-        let coord = mapItem.location.coordinate
+        let coord = mapItem.placemark.coordinate
 
         let body = APIService.CreateEventBody(
             title: title.trimmingCharacters(in: .whitespaces),
@@ -272,7 +331,25 @@ struct CreateEventView: View {
             onCreated?(event)
             dismiss()
         } catch {
-            errorMessage = error.localizedDescription
+            alertMessage = error.localizedDescription
+        }
+    }
+
+    private func dismissKeyboard() {
+        focusedField = nil
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
+    private func selectedCategorySymbol(for category: EventCategory) -> String {
+        switch category {
+        case .music: return "music.note"
+        case .nightlife: return "moon.stars"
+        case .foodDrink: return "fork.knife"
+        case .arts: return "paintpalette"
+        case .sports: return "figure.run"
+        case .speaker: return "mic"
+        case .networking: return "person.2"
+        case .other: return "sparkles"
         }
     }
 }

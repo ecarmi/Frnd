@@ -46,6 +46,11 @@ async def complete_onboarding(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if body.name is not None:
+        trimmed_name = body.name.strip()
+        if trimmed_name:
+            current_user.name = trimmed_name
+
     # Map vibe tag names → category affinities
     category_map = {
         "Live Music": "music", "DJ / Dance": "music", "Jazz & Soul": "music",
@@ -143,6 +148,28 @@ async def get_attended_events(
             Event.start_time < now,
         )
         .order_by(Event.start_time.desc())
+    )
+    events = result.scalars().all()
+    return [await build_feed_event_out(e, current_user, db) for e in events]
+
+
+@router.get("/me/going", response_model=list[EventOut])
+async def get_upcoming_going_events(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(Event)
+        .options(selectinload(Event.venue))
+        .join(RSVP, RSVP.event_id == Event.id)
+        .where(
+            RSVP.user_id == current_user.id,
+            RSVP.status == RSVPStatusEnum.going.value,
+            Event.start_time >= now,
+        )
+        .order_by(Event.start_time.asc())
     )
     events = result.scalars().all()
     return [await build_feed_event_out(e, current_user, db) for e in events]

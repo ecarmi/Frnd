@@ -1,6 +1,35 @@
 import Foundation
 import Combine
 
+private let apiISO8601WithFractionalSeconds: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter
+}()
+
+private let apiISO8601Standard: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter
+}()
+
+private let apiBackendDateFormatters: [DateFormatter] = {
+    let formats = [
+        "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
+        "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd HH:mm:ss.SSSSSS",
+        "yyyy-MM-dd HH:mm:ss"
+    ]
+
+    return formats.map { format in
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = format
+        return formatter
+    }
+}()
+
 // MARK: - API Error
 
 enum APIError: LocalizedError {
@@ -38,7 +67,29 @@ final class APIService: ObservableObject {
 
     private let decoder: JSONDecoder = {
         let d = JSONDecoder()
-        d.dateDecodingStrategy = .iso8601
+        d.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let raw = try container.decode(String.self)
+
+            if let date = apiISO8601WithFractionalSeconds.date(from: raw) {
+                return date
+            }
+            if let date = apiISO8601Standard.date(from: raw) {
+                return date
+            }
+
+            let normalized = raw.hasSuffix("Z") ? String(raw.dropLast()) : raw
+            for formatter in apiBackendDateFormatters {
+                if let date = formatter.date(from: normalized) {
+                    return date
+                }
+            }
+
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Expected a supported backend date format."
+            )
+        }
         return d
     }()
 
@@ -265,6 +316,10 @@ final class APIService: ObservableObject {
         try await request(path: "/users/me/saved")
     }
 
+    func fetchGoingEvents() async throws -> [Event] {
+        try await request(path: "/users/me/going")
+    }
+
     func fetchAttendedEvents() async throws -> [Event] {
         try await request(path: "/users/me/attended")
     }
@@ -309,11 +364,18 @@ final class APIService: ObservableObject {
     }
 
     func completeOnboarding(vibeTagNames: [String]) async throws -> User {
-        struct OnboardingBody: Encodable { let vibe_tag_names: [String] }
+        try await completeOnboarding(name: nil, vibeTagNames: vibeTagNames)
+    }
+
+    func completeOnboarding(name: String?, vibeTagNames: [String]) async throws -> User {
+        struct OnboardingBody: Encodable {
+            let name: String?
+            let vibe_tag_names: [String]
+        }
         return try await request(
             path: "/users/me/onboarding",
             method: "POST",
-            body: OnboardingBody(vibe_tag_names: vibeTagNames)
+            body: OnboardingBody(name: name, vibe_tag_names: vibeTagNames)
         )
     }
 
@@ -342,16 +404,40 @@ final class APIService: ObservableObject {
 
     func joinGroup(inviteCode: String) async throws -> Group {
         struct Body: Encodable { let invite_code: String }
+        let normalized = normalizedInviteCode(from: inviteCode)
         return try await request(
             path: "/groups/join",
             method: "POST",
-            body: Body(invite_code: inviteCode)
+            body: Body(invite_code: normalized)
         )
     }
 
     func leaveGroup(id: String) async throws {
         struct Empty: Codable {}
         let _: Empty = try await request(path: "/groups/\(id)/leave", method: "DELETE")
+    }
+
+    private func normalizedInviteCode(from rawValue: String) -> String {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return trimmed }
+
+        if let url = URL(string: trimmed),
+           url.scheme == "frnd",
+           url.host == "join" {
+            let parts = url.pathComponents.filter { $0 != "/" }
+            if parts.count == 2 {
+                return parts[1]
+            }
+        }
+
+        if trimmed.contains("/") {
+            let components = trimmed.split(separator: "/").map(String.init)
+            if let last = components.last, !last.isEmpty {
+                return last
+            }
+        }
+
+        return trimmed
     }
 
     // MARK: - Activities (LFG)
