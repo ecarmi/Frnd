@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     twilio_phone_number: str = ""
 
     environment: str = "development"
+    default_feed_lat: float = 41.7991
+    default_feed_lng: float = -87.5876
+    default_trending_label: str = "Trending nearby"
+    launch_access_message: str = "Frnd is currently available for approved campus email domains. More universities are coming soon!"
+    allowed_email_domains: str = "uchicago.edu"
 
     class Config:
         env_file = ".env"

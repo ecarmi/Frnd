@@ -16,6 +16,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ..config import settings
 from ..models import (
     ActivityParticipant,
     ActivityPost,
@@ -294,7 +295,7 @@ def _ai_reason(event: Event, friends_going: list[User], user: User) -> str:
             return f"{', '.join(names)} + {extra} going"
         return f"{', '.join(names)} going"
     if event.trending_score > 0.8:
-        return f"Trending in Chicago"
+        return settings.default_trending_label
     if category == "music":
         return "Based on your music taste"
     if category == "nightlife":
@@ -329,8 +330,8 @@ def _build_group_activity_feed_out(post: ActivityPost, group: Group, current_use
         venue=VenueOut(
             id=f"group-activity:{post.id}",
             name=venue_name,
-            latitude=post.latitude or 41.7991,
-            longitude=post.longitude or -87.5876,
+            latitude=post.latitude or settings.default_feed_lat,
+            longitude=post.longitude or settings.default_feed_lng,
             address=post.location or group.name,
             vibe_tags=[],
             images=[],

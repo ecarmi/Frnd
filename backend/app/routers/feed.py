@@ -5,6 +5,7 @@ from ..database import get_db
 from ..models import User
 from ..schemas import FeedResponse
 from ..auth import get_current_user
+from ..config import settings
 from ..services.feed import get_feed
 
 router = APIRouter(prefix="/feed", tags=["feed"])
@@ -12,8 +13,8 @@ router = APIRouter(prefix="/feed", tags=["feed"])
 
 @router.get("", response_model=FeedResponse)
 async def feed(
-    lat: float = Query(41.7991, description="User latitude"),
-    lng: float = Query(-87.5876, description="User longitude"),
+    lat: float = Query(settings.default_feed_lat, description="User latitude"),
+    lng: float = Query(settings.default_feed_lng, description="User longitude"),
     radius: float = Query(8.0, description="Search radius in km"),
     cursor: str = Query(None),
     db: AsyncSession = Depends(get_db),

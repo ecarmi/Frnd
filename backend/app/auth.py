@@ -105,7 +105,9 @@ def university_from_email(email: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 ALLOWED_DOMAINS: set[str] = {
-    "uchicago.edu",
+    domain.strip().lower()
+    for domain in settings.allowed_email_domains.split(",")
+    if domain.strip()
 }
 
 

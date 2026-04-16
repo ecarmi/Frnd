@@ -30,7 +30,7 @@ async def request_email_otp(body: OTPRequest, db: AsyncSession = Depends(get_db)
     if not email:
         raise HTTPException(status_code=400, detail="Email is required")
     if not is_allowed_email(email):
-        raise HTTPException(status_code=400, detail="Frnd is currently available at UChicago. More universities coming soon!")
+        raise HTTPException(status_code=400, detail=settings.launch_access_message)
 
     # Dev bypass — don't send an email, just return success
     if email == DEV_BYPASS_EMAIL:
