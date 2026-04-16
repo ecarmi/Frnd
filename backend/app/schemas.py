@@ -115,6 +115,10 @@ class EventOut(OrmBase):
     image_url: Optional[str] = None
     source: str
     creator_id: Optional[str] = None
+    activity_post_id: Optional[str] = None
+    group_name: Optional[str] = None
+    is_members_only: bool = False
+    is_announcement: bool = False
     trending_score: float = 0.0
     # Feed extras
     friends_going: list[UserOut] = []
@@ -319,6 +323,9 @@ class ActivityPostOut(OrmBase):
     scheduled_time: Optional[datetime] = None
     max_participants: Optional[int] = None
     group_id: Optional[str] = None
+    group_name: Optional[str] = None
+    is_members_only: bool = False
+    is_announcement: bool = False
     status: ActivityStatusEnum
     created_at: datetime
     creator: Optional[UserOut] = None
@@ -337,6 +344,8 @@ class ActivityPostCreate(BaseModel):
     scheduled_time: Optional[datetime] = None
     max_participants: Optional[int] = None
     group_id: Optional[str] = None
+    is_members_only: Optional[bool] = None
+    is_announcement: bool = False
 
 
 class ActivityPostUpdate(BaseModel):
@@ -349,6 +358,8 @@ class ActivityPostUpdate(BaseModel):
     scheduled_time: Optional[datetime] = None
     max_participants: Optional[int] = None
     group_id: Optional[str] = None
+    is_members_only: Optional[bool] = None
+    is_announcement: Optional[bool] = None
 
 
 # ---------------------------------------------------------------------------

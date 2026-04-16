@@ -8,9 +8,7 @@ struct CreatePlanView: View {
     @EnvironmentObject private var savedEventsStore: SavedEventsStore
     @State private var title: String = ""
     @State private var selectedEventIds: Set<String> = []
-    @State private var inviteeIds: Set<String> = []
     @State private var isLoading = false
-    @State private var friends: [Friendship] = []
     @State private var savedEvents: [Event] = []
     @State private var errorMessage: String?
 
@@ -79,32 +77,6 @@ struct CreatePlanView: View {
                             savedEventsSection
                         }
 
-                        // Invite friends
-                        if !friends.isEmpty {
-                            VStack(alignment: .leading, spacing: Spacing.sm) {
-                                Text("Invite")
-                                    .font(.mono)
-                                    .foregroundColor(.textTertiary)
-                                    .textCase(.uppercase)
-                                    .tracking(1.5)
-
-                                ForEach(friends) { friendship in
-                                    if let user = friendship.otherUser {
-                                        InviteRow(
-                                            user: user,
-                                            isSelected: inviteeIds.contains(user.id)
-                                        ) {
-                                            if inviteeIds.contains(user.id) {
-                                                inviteeIds.remove(user.id)
-                                            } else {
-                                                inviteeIds.insert(user.id)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
                         if let errorMessage {
                             Text(errorMessage)
                                 .font(.captionMedium)
@@ -141,7 +113,6 @@ struct CreatePlanView: View {
             }
         }
         .task {
-            friends = (try? await APIService.shared.fetchFriends()) ?? []
             let fetchedSavedEvents = (try? await APIService.shared.fetchSavedEvents()) ?? savedEventsStore.savedEvents
             savedEvents = fetchedSavedEvents
             savedEventsStore.replaceSavedEvents(fetchedSavedEvents)
@@ -163,7 +134,7 @@ struct CreatePlanView: View {
                 let plan = try await APIService.shared.createPlan(
                     title: trimmedTitle,
                     eventIds: Array(selectedEventIds),
-                    inviteeIds: Array(inviteeIds)
+                    inviteeIds: []
                 )
                 onCreated?(plan)
                 dismiss()
@@ -229,29 +200,5 @@ struct CreatePlanView: View {
                 }
             }
         }
-    }
-}
-
-private struct InviteRow: View {
-    let user: User
-    let isSelected: Bool
-    let onToggle: () -> Void
-
-    var body: some View {
-        Button(action: onToggle) {
-            HStack(spacing: Spacing.md) {
-                AvatarView(name: user.name, imageURL: user.avatarURL, size: 40)
-                Text(user.name)
-                    .font(.headingSmall)
-                    .foregroundColor(.textPrimary)
-                Spacer()
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
-                    .foregroundColor(isSelected ? .ember : .textTertiary)
-            }
-            .padding(Spacing.md)
-            .cardStyle()
-        }
-        .animation(.spring(response: 0.2), value: isSelected)
     }
 }

@@ -188,7 +188,7 @@ struct EventDetailView: View {
             let names = event.friendsGoing.prefix(2).map { $0.name.components(separatedBy: " ").first ?? $0.name }.joined(separator: ", ")
             if !names.isEmpty {
                 let extra = max(0, event.friendsGoing.count - 2)
-                Text(extra > 0 ? "\(names) + \(extra) friends going" : "\(names) going")
+                Text(extra > 0 ? "\(names) + \(extra) going" : "\(names) going")
                     .font(.captionMedium)
                     .foregroundColor(.textSecondary)
             }
@@ -201,7 +201,6 @@ struct EventDetailView: View {
         let isSaved = savedEventsStore.isSaved(event)
 
         return HStack(spacing: Spacing.md) {
-            // RSVP / Buy
             Button {
                 toggleRSVP()
             } label: {
@@ -209,7 +208,7 @@ struct EventDetailView: View {
                     if isRSVPLoading {
                         ProgressView().tint(.white).scaleEffect(0.8)
                     } else {
-                        Image(systemName: rsvpStatus == .going ? "checkmark" : "ticket.fill")
+                        Image(systemName: rsvpStatus == .going ? "checkmark" : (event.activityPostId == nil ? "ticket.fill" : "person.badge.plus"))
                             .font(.system(size: 14, weight: .bold))
                         Text(rsvpButtonLabel)
                             .font(.headingSmall)
@@ -225,33 +224,36 @@ struct EventDetailView: View {
             }
             .disabled(isRSVPLoading)
 
-            // Save
-            Button {
-                Task { try? await savedEventsStore.toggle(event: event) }
-            } label: {
-                Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
-                    .font(.system(size: 20))
-                    .foregroundColor(isSaved ? .ember : .textSecondary)
-                    .frame(width: 48, height: 48)
-                    .background(Color.bgRaised)
-                    .clipShape(RoundedRectangle(cornerRadius: Radius.md))
-            }
+            if event.activityPostId == nil {
+                Button {
+                    Task { try? await savedEventsStore.toggle(event: event) }
+                } label: {
+                    Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+                        .font(.system(size: 20))
+                        .foregroundColor(isSaved ? .ember : .textSecondary)
+                        .frame(width: 48, height: 48)
+                        .background(Color.bgRaised)
+                        .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+                }
 
-            // Start a Plan
-            Button {
-                showCreatePlan = true
-            } label: {
-                Image(systemName: "person.2.fill")
-                    .font(.system(size: 18))
-                    .foregroundColor(.violet)
-                    .frame(width: 48, height: 48)
-                    .background(Color.bgRaised)
-                    .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+                Button {
+                    showCreatePlan = true
+                } label: {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.violet)
+                        .frame(width: 48, height: 48)
+                        .background(Color.bgRaised)
+                        .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+                }
             }
         }
     }
 
     private var rsvpButtonLabel: String {
+        if event.activityPostId != nil {
+            return rsvpStatus == .going ? "Joined" : "Join Activity"
+        }
         switch rsvpStatus {
         case .going:      return "Going"
         case .interested: return "Interested"
@@ -263,26 +265,50 @@ struct EventDetailView: View {
         guard !isRSVPLoading else { return }
 
         isRSVPLoading = true
-        let previousStatus = rsvpStatus
-        let newStatus: RSVPStatus = rsvpStatus == .going ? .interested : .going
-        rsvpStatus = newStatus
-        event.userRSVPStatus = newStatus
-
         Task {
             defer { isRSVPLoading = false }
-            do {
-                let rsvp = try await APIService.shared.rsvp(eventId: event.id, status: newStatus)
-                rsvpStatus = rsvp.status
-                event.userRSVPStatus = rsvp.status
-                await refreshEvent()
-            } catch {
-                rsvpStatus = previousStatus
-                event.userRSVPStatus = previousStatus
+            if let activityPostId = event.activityPostId {
+                let wasJoined = rsvpStatus == .going
+                rsvpStatus = wasJoined ? nil : .going
+                event.userRSVPStatus = rsvpStatus
+
+                do {
+                    let updatedActivity: ActivityPost
+                    if wasJoined {
+                        try await APIService.shared.leaveActivity(id: activityPostId)
+                        updatedActivity = try await APIService.shared.fetchActivity(id: activityPostId)
+                    } else {
+                        updatedActivity = try await APIService.shared.joinActivity(id: activityPostId)
+                    }
+                    event.friendsGoing = updatedActivity.participants.compactMap(\.user)
+                    event.totalInterested = updatedActivity.participantCount
+                    event.userRSVPStatus = updatedActivity.isJoined ? .going : nil
+                    rsvpStatus = event.userRSVPStatus
+                } catch {
+                    rsvpStatus = wasJoined ? .going : nil
+                    event.userRSVPStatus = rsvpStatus
+                }
+            } else {
+                let previousStatus = rsvpStatus
+                let newStatus: RSVPStatus = rsvpStatus == .going ? .interested : .going
+                rsvpStatus = newStatus
+                event.userRSVPStatus = newStatus
+
+                do {
+                    let rsvp = try await APIService.shared.rsvp(eventId: event.id, status: newStatus)
+                    rsvpStatus = rsvp.status
+                    event.userRSVPStatus = rsvp.status
+                    await refreshEvent()
+                } catch {
+                    rsvpStatus = previousStatus
+                    event.userRSVPStatus = previousStatus
+                }
             }
         }
     }
 
     private func refreshEvent() async {
+        guard event.activityPostId == nil else { return }
         guard let refreshed = try? await APIService.shared.fetchEvent(id: event.id) else { return }
         event = refreshed
         rsvpStatus = refreshed.userRSVPStatus

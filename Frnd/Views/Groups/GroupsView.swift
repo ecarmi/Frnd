@@ -212,9 +212,9 @@ struct GroupDetailView: View {
     @State private var activities: [ActivityPost] = []
     @State private var loadingActivities = false
     @State private var showCreateActivity = false
-    @State private var showCreateEvent = false
     @State private var showEditGroup = false
     @State private var isJoiningPublicGroup = false
+    @State private var showJoinedPublicGroup = false
     @State private var actionError: String?
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppState
@@ -291,8 +291,7 @@ struct GroupDetailView: View {
                     Menu {
                         if canManageGroup {
                             Button("Edit Group") { showEditGroup = true }
-                            Button("Post Event") { showCreateEvent = true }
-                            Button("Post Activity") { showCreateActivity = true }
+                            Button("Create Activity") { showCreateActivity = true }
                         }
                         if isOwner {
                             Button("Delete Group", role: .destructive) {
@@ -323,9 +322,6 @@ struct GroupDetailView: View {
                     }
                 }
             }
-        }
-        .sheet(isPresented: $showCreateEvent) {
-            CreateEventView(groupId: group.id)
         }
         .sheet(isPresented: $showCreateActivity) {
             CreateActivityView(groupId: group.id) { post in
@@ -374,24 +370,31 @@ struct GroupDetailView: View {
                 Button {
                     Task {
                         isJoiningPublicGroup = true
-                        defer { isJoiningPublicGroup = false }
                         do {
+                            showJoinedPublicGroup = false
                             let joined = try await viewModel.joinPublicGroup(id: group.id)
+                            showJoinedPublicGroup = true
+                            isJoiningPublicGroup = false
+                            try? await Task.sleep(nanoseconds: 700_000_000)
                             applyGroupUpdate(joined)
                             await loadActivities()
                         } catch {
+                            isJoiningPublicGroup = false
+                            showJoinedPublicGroup = false
                             actionError = error.localizedDescription
                         }
                     }
                 } label: {
                     if isJoiningPublicGroup {
                         ProgressView().tint(.white)
+                    } else if showJoinedPublicGroup {
+                        Text("Joined")
                     } else {
                         Text("Join Group")
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(isJoiningPublicGroup)
+                .disabled(isJoiningPublicGroup || showJoinedPublicGroup)
                 .padding(.top, Spacing.sm)
             }
         }
@@ -483,14 +486,14 @@ struct GroupDetailView: View {
     private var activitiesSection: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             HStack {
-                Text("Activity Posts")
+                Text("Group Posts")
                     .font(.mono)
                     .foregroundColor(.textTertiary)
                     .textCase(.uppercase)
                     .tracking(2)
                 Spacer()
                 if canManageGroup {
-                    Button("Post") { showCreateActivity = true }
+                    Button("Create") { showCreateActivity = true }
                         .font(.captionMedium)
                         .foregroundColor(.ember)
                 }
@@ -507,6 +510,7 @@ struct GroupDetailView: View {
                     ForEach(activities) { post in
                         ActivityPostCard(
                             post: post,
+                            canManageGroupPost: canManageGroup,
                             onUpdate: { updated in
                                 if let idx = activities.firstIndex(where: { $0.id == updated.id }) {
                                     activities[idx] = updated

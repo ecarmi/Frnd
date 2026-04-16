@@ -8,6 +8,10 @@ struct EventCardView: View {
     @EnvironmentObject private var savedEventsStore: SavedEventsStore
     @State private var showDetail = false
 
+    private var isActivityCard: Bool {
+        event.activityPostId != nil
+    }
+
     var body: some View {
         cardContent
             .onTapGesture { showDetail = true }
@@ -32,14 +36,18 @@ struct EventCardView: View {
                     Image(systemName: "mappin.fill")
                         .font(.captionSmall)
                         .foregroundColor(.ember)
-                    Text(event.venue.name)
+                    Text(isActivityCard ? (event.groupName ?? event.venue.name) : event.venue.name)
                         .font(.captionMedium)
                         .foregroundColor(.textSecondary)
                 }
 
                 HStack(spacing: Spacing.sm) {
                     PillView(text: event.startTime.relativeEventTime, color: .ember)
-                    PillView(text: event.priceDisplay, color: event.isFree ? .teal : .textSecondary)
+                    if isActivityCard {
+                        PillView(text: event.isMembersOnly ? "Members Only" : "Open", color: .teal)
+                    } else {
+                        PillView(text: event.priceDisplay, color: event.isFree ? .teal : .textSecondary)
+                    }
                     Spacer()
                 }
 
@@ -81,7 +89,7 @@ struct EventCardView: View {
                     )
                 )
 
-            Text(event.category.emoji)
+            Text(event.isAnnouncement ? "📢" : event.category.emoji)
                 .font(.system(size: 72))
                 .opacity(0.8)
 
@@ -117,7 +125,12 @@ struct EventCardView: View {
                     .map { $0.name.components(separatedBy: " ").first ?? $0.name }
                     .joined(separator: ", ")
                 let extra = max(0, event.friendsGoing.count - 2)
-                let label = extra > 0 ? "\(names) +\(extra) going" : "\(names) going"
+                let label: String
+                if isActivityCard {
+                    label = extra > 0 ? "\(names) +\(extra) joined" : "\(names) joined"
+                } else {
+                    label = extra > 0 ? "\(names) +\(extra) going" : "\(names) going"
+                }
                 Text(label)
                     .font(.captionMedium)
                     .foregroundColor(.textSecondary)
@@ -125,7 +138,7 @@ struct EventCardView: View {
                 Image(systemName: "person.fill")
                     .font(.captionSmall)
                     .foregroundColor(.textTertiary)
-                Text("\(event.totalInterested) interested")
+                Text(isActivityCard ? "\(event.totalInterested) joined" : "\(event.totalInterested) interested")
                     .font(.captionMedium)
                     .foregroundColor(.textSecondary)
             }
@@ -139,11 +152,13 @@ struct EventCardView: View {
         let isSaved = savedEventsStore.isSaved(event)
 
         return HStack(spacing: 0) {
-            ActionButton(
-                icon: isSaved ? "bookmark.fill" : "bookmark",
-                color: isSaved ? .ember : .textTertiary,
-                action: onSave
-            )
+            if !isActivityCard {
+                ActionButton(
+                    icon: isSaved ? "bookmark.fill" : "bookmark",
+                    color: isSaved ? .ember : .textTertiary,
+                    action: onSave
+                )
+            }
             Spacer()
             ShareLink(item: shareText) {
                 Image(systemName: "paperplane")
@@ -155,11 +170,13 @@ struct EventCardView: View {
             Spacer()
             Button(action: onRSVP) {
                 HStack(spacing: 6) {
-                    Image(systemName: event.userRSVPStatus == .going ? "checkmark" : "ticket.fill")
+                    Image(systemName: event.userRSVPStatus == .going ? "checkmark" : (isActivityCard ? "person.badge.plus" : "ticket.fill"))
                         .font(.system(size: 14, weight: .bold))
-                    Text(event.userRSVPStatus == .going
-                         ? "Going"
-                         : (event.isFree ? "RSVP" : "Get Tickets"))
+                    Text(
+                        event.userRSVPStatus == .going
+                        ? (isActivityCard ? "Joined" : "Going")
+                        : (isActivityCard ? "Join" : (event.isFree ? "RSVP" : "Get Tickets"))
+                    )
                         .font(.captionMedium)
                 }
                 .foregroundColor(.white)
@@ -172,7 +189,10 @@ struct EventCardView: View {
     }
 
     private var shareText: String {
-        "\(event.title) at \(event.venue.name) on \(event.startTime.formatted(date: .abbreviated, time: .shortened)). Check it out on Frnd."
+        if isActivityCard {
+            return "\(event.title) in \(event.groupName ?? event.venue.name) on \(event.startTime.formatted(date: .abbreviated, time: .shortened)). Check it out on Frnd."
+        }
+        return "\(event.title) at \(event.venue.name) on \(event.startTime.formatted(date: .abbreviated, time: .shortened)). Check it out on Frnd."
     }
 }
 

@@ -577,22 +577,7 @@ struct PlanDetailView: View {
         let onInvited: (Plan) -> Void
         
         @Environment(\.dismiss) private var dismiss
-        @State private var friends: [Friendship] = []
-        @State private var selected: Set<String> = []
-        @State private var isLoading = false
-        @State private var isSending = false
         @State private var error: String?
-        
-        private var alreadyInPlan: Set<String> {
-            Set(plan.members.map { $0.userId })
-        }
-        
-        private var invitableFriends: [Friendship] {
-            friends.filter {
-                guard let user = $0.otherUser else { return false }
-                return !alreadyInPlan.contains(user.id)
-            }
-        }
         
         var body: some View {
             NavigationStack {
@@ -629,41 +614,7 @@ struct PlanDetailView: View {
                             }
                             .listRowBackground(Color.bgRaised)
                         }
-                        
-                        if isLoading {
-                            Section {
-                                HStack { Spacer(); ProgressView().tint(.ember); Spacer() }
-                            }
-                            .listRowBackground(Color.bgRaised)
-                        } else if !invitableFriends.isEmpty {
-                            Section("Also invite friends") {
-                                ForEach(invitableFriends) { friendship in
-                                    if let user = friendship.otherUser {
-                                        Button {
-                                            if selected.contains(user.id) {
-                                                selected.remove(user.id)
-                                            } else {
-                                                selected.insert(user.id)
-                                            }
-                                        } label: {
-                                            HStack(spacing: Spacing.md) {
-                                                AvatarView(name: user.name, imageURL: user.avatarURL, size: 40)
-                                                Text(user.name)
-                                                    .font(.headingSmall)
-                                                    .foregroundColor(.textPrimary)
-                                                Spacer()
-                                                if selected.contains(user.id) {
-                                                    Image(systemName: "checkmark.circle.fill")
-                                                        .foregroundColor(.ember)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            .listRowBackground(Color.bgRaised)
-                        }
-                        
+
                         if let error = error {
                             Section {
                                 Text(error).foregroundColor(.rose).font(.captionMedium)
@@ -679,31 +630,6 @@ struct PlanDetailView: View {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Cancel") { dismiss() }.foregroundColor(.textSecondary)
                     }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Invite (\(selected.count))") {
-                            Task {
-                                isSending = true
-                                do {
-                                    let updated = try await APIService.shared.inviteToPlan(
-                                        planId: plan.id,
-                                        userIds: Array(selected)
-                                    )
-                                    onInvited(updated)
-                                    dismiss()
-                                } catch {
-                                    self.error = error.localizedDescription
-                                }
-                                isSending = false
-                            }
-                        }
-                        .foregroundColor(.ember)
-                        .disabled(selected.isEmpty || isSending)
-                    }
-                }
-                .task {
-                    isLoading = true
-                    friends = (try? await APIService.shared.fetchFriends()) ?? []
-                    isLoading = false
                 }
             }
         }

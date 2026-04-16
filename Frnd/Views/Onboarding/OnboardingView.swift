@@ -327,7 +327,7 @@ private struct NameStep: View {
                 Text("What should we call you?")
                     .font(.displayMedium)
                     .foregroundColor(.textPrimary)
-                Text("Your name is shown to friends on plans.")
+                Text("Your name is shown on shared plans and group activity.")
                     .font(.bodyLarge)
                     .foregroundColor(.textSecondary)
             }

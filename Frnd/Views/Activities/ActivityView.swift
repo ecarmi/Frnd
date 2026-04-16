@@ -117,6 +117,7 @@ struct ActivityPostCard: View {
     let post: ActivityPost
     let onUpdate: (ActivityPost) -> Void
     var onDelete: ((String) -> Void)? = nil
+    var canManageGroupPost: Bool = false
 
     @EnvironmentObject private var appState: AppState
     @State private var isLoading = false
@@ -124,6 +125,10 @@ struct ActivityPostCard: View {
 
     private var isCreator: Bool {
         post.creatorId == appState.currentUser?.id
+    }
+
+    private var canEditPost: Bool {
+        isCreator || canManageGroupPost
     }
 
     var body: some View {
@@ -145,7 +150,7 @@ struct ActivityPostCard: View {
 
                 Spacer()
 
-                if isCreator {
+                if canEditPost {
                     Menu {
                         Button("Edit") { showEdit = true }
                         Button("Delete", role: .destructive) {
@@ -181,6 +186,18 @@ struct ActivityPostCard: View {
                 .font(.headingSmall)
                 .foregroundColor(.textPrimary)
 
+            HStack(spacing: Spacing.xs) {
+                if post.isAnnouncement {
+                    PillView(text: "Announcement", color: .ember)
+                }
+                if let groupName = post.groupName {
+                    PillView(text: groupName, color: .textSecondary)
+                }
+                if post.groupId != nil {
+                    PillView(text: post.isMembersOnly ? "Members Only" : "Open to Everyone", color: .teal)
+                }
+            }
+
             if !post.description.isEmpty {
                 Text(post.description)
                     .font(.bodyMedium)
@@ -215,7 +232,9 @@ struct ActivityPostCard: View {
 
                 Spacer()
 
-                joinButton
+                if !post.isAnnouncement {
+                    joinButton
+                }
             }
         }
         .padding(Spacing.base)
@@ -280,6 +299,8 @@ struct CreateActivityView: View {
     @State private var error: String?
     @State private var groups: [Group] = []
     @State private var selectedGroupId: String?
+    @State private var isMembersOnly: Bool
+    @State private var isAnnouncement: Bool
 
     init(
         groupId: String? = nil,
@@ -297,10 +318,17 @@ struct CreateActivityView: View {
         _hasTime = State(initialValue: existingPost?.scheduledTime != nil)
         _maxParticipants = State(initialValue: existingPost?.maxParticipants.map(String.init) ?? "")
         _selectedGroupId = State(initialValue: existingPost?.groupId)
+        _isMembersOnly = State(initialValue: existingPost?.isMembersOnly ?? (groupId != nil))
+        _isAnnouncement = State(initialValue: existingPost?.isAnnouncement ?? false)
     }
 
     private var resolvedGroupId: String? { fixedGroupId ?? selectedGroupId }
     private var canPickGroup: Bool { fixedGroupId == nil && !adminGroups.isEmpty }
+    private var selectedGroup: Group? {
+        adminGroups.first { $0.id == resolvedGroupId }
+    }
+    private var isGroupPost: Bool { resolvedGroupId != nil }
+    private var allowsAnnouncements: Bool { selectedGroup?.isPrivate == false && isGroupPost }
     private var adminGroups: [Group] {
         guard let currentUserId = appState.currentUser?.id else { return [] }
         return groups.filter { group in
@@ -333,6 +361,31 @@ struct CreateActivityView: View {
                         .foregroundColor(.textPrimary)
                     }
 
+                    if isGroupPost {
+                        Section("Visibility") {
+                            Toggle("Members only", isOn: $isMembersOnly)
+                            Text(isMembersOnly
+                                 ? "Only group members will see this in the group and For You."
+                                 : "Anyone can discover this from For You, and group members will still see it too.")
+                                .font(.captionMedium)
+                                .foregroundColor(.textSecondary)
+                        }
+                    }
+
+                    if allowsAnnouncements {
+                        Section("Post Type") {
+                            Picker("Post Type", selection: $isAnnouncement) {
+                                Text("Activity").tag(false)
+                                Text("Announcement").tag(true)
+                            }
+                            .pickerStyle(.segmented)
+                            .disabled(existingPost != nil)
+                            Text("Announcements are for updates from group admins. Activities are joinable plans.")
+                                .font(.captionMedium)
+                                .foregroundColor(.textSecondary)
+                        }
+                    }
+
                     Section("Where & When") {
                         TextField("Location", text: $location)
                             .foregroundColor(.textPrimary)
@@ -343,10 +396,12 @@ struct CreateActivityView: View {
                         }
                     }
 
-                    Section("Spots") {
-                        TextField("Max participants (optional)", text: $maxParticipants)
-                            .keyboardType(.numberPad)
-                            .foregroundColor(.textPrimary)
+                    if !isAnnouncement {
+                        Section("Spots") {
+                            TextField("Max participants (optional)", text: $maxParticipants)
+                                .keyboardType(.numberPad)
+                                .foregroundColor(.textPrimary)
+                        }
                     }
 
                     // Group picker — only shown when not launched from within a group
@@ -403,7 +458,9 @@ struct CreateActivityView: View {
                                         longitude: nil,
                                         scheduledTime: hasTime ? scheduledTime : nil,
                                         maxParticipants: maxP,
-                                        groupId: resolvedGroupId
+                                        groupId: resolvedGroupId,
+                                        isMembersOnly: isGroupPost ? isMembersOnly : nil,
+                                        isAnnouncement: existingPost?.isAnnouncement ?? isAnnouncement
                                     )
                                 } else {
                                     post = try await APIService.shared.createActivity(
@@ -415,7 +472,9 @@ struct CreateActivityView: View {
                                         longitude: nil,
                                         scheduledTime: hasTime ? scheduledTime : nil,
                                         maxParticipants: maxP,
-                                        groupId: resolvedGroupId
+                                        groupId: resolvedGroupId,
+                                        isMembersOnly: isGroupPost ? isMembersOnly : nil,
+                                        isAnnouncement: isAnnouncement
                                     )
                                 }
                                 onSaved(post)

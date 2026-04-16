@@ -343,10 +343,13 @@ class ActivityPost(Base):
     scheduled_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     max_participants: Mapped[Optional[int]] = mapped_column(Integer)
     group_id: Mapped[Optional[str]]         = mapped_column(ForeignKey("groups.id"), nullable=True)
+    is_members_only: Mapped[bool]           = mapped_column(Boolean, default=False)
+    is_announcement: Mapped[bool]           = mapped_column(Boolean, default=False)
     status: Mapped[ActivityStatusEnum]      = mapped_column(EnumString(ActivityStatusEnum), default=ActivityStatusEnum.open)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     creator: Mapped["User"] = relationship()
+    group: Mapped[Optional["Group"]] = relationship()
     participants: Mapped[list["ActivityParticipant"]] = relationship(back_populates="activity",
                                                                       cascade="all, delete-orphan")
 

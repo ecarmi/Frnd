@@ -12,12 +12,27 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import numpy as np
-from sqlalchemy import select, or_
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..models import User, Event, Venue, RSVP, SavedEvent, Friendship, RSVPStatusEnum
-from ..schemas import EventOut, UserOut
+from ..models import (
+    ActivityParticipant,
+    ActivityPost,
+    ActivityStatusEnum,
+    ActivityTypeEnum,
+    Event,
+    EventCategoryEnum,
+    Friendship,
+    Group,
+    GroupMembership,
+    RSVP,
+    RSVPStatusEnum,
+    SavedEvent,
+    User,
+    Venue,
+)
+from ..schemas import EventOut, UserOut, VenueOut
 from ..enum_utils import enum_equals, enum_value
 
 
@@ -109,7 +124,7 @@ async def get_feed(
         events = all_result.scalars().all()
 
     if not events:
-        return [], None
+        events = []
 
     event_ids = [e.id for e in events]
 
@@ -119,7 +134,7 @@ async def get_feed(
             RSVP.event_id.in_(event_ids),
             RSVP.user_id.in_(friend_ids),
         )
-    ) if friend_ids else None
+    ) if friend_ids and event_ids else None
 
     friend_rsvps = friend_rsvps_result.scalars().all() if friend_rsvps_result else []
 
@@ -164,14 +179,42 @@ async def get_feed(
             RSVP.event_id.in_(event_ids),
             RSVP.status.in_([RSVPStatusEnum.going.value, RSVPStatusEnum.interested.value]),
         )
-    )
+    ) if event_ids else None
     total_map: dict[str, int] = {}
-    for event_id, _ in total_result.all():
+    for event_id, _ in (total_result.all() if total_result else []):
         total_map[event_id] = total_map.get(event_id, 0) + 1
+
+    member_group_rows = await db.execute(
+        select(GroupMembership.group_id).where(GroupMembership.user_id == user.id)
+    )
+    member_group_ids = {row[0] for row in member_group_rows.all()}
+
+    activity_visibility_filters = [
+        and_(Group.is_private == False, ActivityPost.is_members_only == False),
+    ]
+    if member_group_ids:
+        activity_visibility_filters.append(ActivityPost.group_id.in_(member_group_ids))
+
+    group_activities_result = await db.execute(
+        select(ActivityPost)
+        .options(
+            selectinload(ActivityPost.group),
+            selectinload(ActivityPost.participants).selectinload(ActivityParticipant.user).selectinload(User.taste_profile),
+        )
+        .join(Group, ActivityPost.group_id == Group.id)
+        .where(
+            ActivityPost.group_id.is_not(None),
+            ActivityPost.status == ActivityStatusEnum.open.value,
+            ActivityPost.is_announcement == False,
+            or_(*activity_visibility_filters),
+        )
+        .limit(100)
+    )
+    group_activities = group_activities_result.scalars().unique().all()
 
     # 8. Score and rank
     user_vector = user.taste_vector or []
-    scored = []
+    scored_items: list[tuple[float, EventOut]] = []
     for event in events:
         going = going_map.get(event.id, [])
         interested = interested_map.get(event.id, [])
@@ -188,15 +231,8 @@ async def get_feed(
             0.15 * t_score +
             0.10 * min(1.0, event.trending_score or 0.0)
         )
-        scored.append((final, event, going, interested))
-
-    scored.sort(key=lambda x: x[0], reverse=True)
-
-    # 9. Build output
-    out = []
-    for _, event, going, interested in scored[:limit]:
         ai_reason = _ai_reason(event, going, user)
-        out.append(EventOut(
+        scored_items.append((final, EventOut(
             id=event.id,
             title=event.title,
             description=event.description,
@@ -210,6 +246,7 @@ async def get_feed(
             tags=event.tags or [],
             image_url=event.image_url,
             source=event.source,
+            creator_id=event.creator_id,
             trending_score=event.trending_score or 0.0,
             friends_going=[UserOut.model_validate(u) for u in going],
             friends_interested=[UserOut.model_validate(u) for u in interested],
@@ -217,9 +254,20 @@ async def get_feed(
             user_rsvp_status=user_rsvps.get(event.id),
             ai_reason_chip=ai_reason,
             is_saved=event.id in saved_ids,
-        ))
+        )))
 
-    return out, None
+    for post in group_activities:
+        if not post.group:
+            continue
+        start_like = post.scheduled_time or post.created_at
+        t_score = temporal_score(start_like) if post.scheduled_time else 0.35
+        participation_score = min(1.0, len(post.participants) / 6.0)
+        membership_score = 1.0 if post.group_id in member_group_ids else 0.55
+        final = 0.55 * t_score + 0.25 * participation_score + 0.20 * membership_score
+        scored_items.append((final, _build_group_activity_feed_out(post, post.group, user.id)))
+
+    scored_items.sort(key=lambda item: item[0], reverse=True)
+    return [item for _, item in scored_items[:limit]], None
 
 
 def _ai_reason(event: Event, friends_going: list[User], user: User) -> str:
@@ -229,7 +277,7 @@ def _ai_reason(event: Event, friends_going: list[User], user: User) -> str:
         names = [f.name.split()[0] for f in friends_going[:2]]
         extra = len(friends_going) - 2
         if extra > 0:
-            return f"{', '.join(names)} + {extra} friends going"
+            return f"{', '.join(names)} + {extra} going"
         return f"{', '.join(names)} going"
     if event.trending_score > 0.8:
         return f"Trending in Chicago"
@@ -238,6 +286,65 @@ def _ai_reason(event: Event, friends_going: list[User], user: User) -> str:
     if category == "nightlife":
         return "Popular on Friday nights"
     return f"Matches your vibe"
+
+
+def _activity_category(activity_type: ActivityTypeEnum) -> EventCategoryEnum:
+    mapping = {
+        ActivityTypeEnum.study: EventCategoryEnum.speaker,
+        ActivityTypeEnum.sports: EventCategoryEnum.sports,
+        ActivityTypeEnum.social: EventCategoryEnum.nightlife,
+        ActivityTypeEnum.food: EventCategoryEnum.food_drink,
+        ActivityTypeEnum.creative: EventCategoryEnum.arts,
+        ActivityTypeEnum.wellness: EventCategoryEnum.sports,
+        ActivityTypeEnum.other: EventCategoryEnum.other,
+    }
+    return mapping.get(activity_type, EventCategoryEnum.other)
+
+
+def _build_group_activity_feed_out(post: ActivityPost, group: Group, current_user_id: str) -> EventOut:
+    participant_users = [p.user for p in post.participants if p.user and p.user_id != current_user_id][:8]
+    user_joined = any(p.user_id == current_user_id for p in post.participants)
+    visibility_label = "Members only" if post.is_members_only else "Open to everyone"
+    venue_name = post.location or group.name
+    description = post.description.strip() or f"{group.name} activity"
+
+    return EventOut(
+        id=f"activity:{post.id}",
+        title=post.title,
+        description=description,
+        venue=VenueOut(
+            id=f"group-activity:{post.id}",
+            name=venue_name,
+            latitude=post.latitude or 41.7991,
+            longitude=post.longitude or -87.5876,
+            address=post.location or group.name,
+            vibe_tags=[],
+            images=[],
+            created_at=post.created_at,
+        ),
+        start_time=post.scheduled_time or post.created_at,
+        end_time=None,
+        price_min=0,
+        price_max=0,
+        capacity=post.max_participants,
+        category=_activity_category(post.activity_type),
+        group_id=group.id,
+        tags=[group.name, visibility_label],
+        image_url=None,
+        source="group_activity",
+        creator_id=post.creator_id,
+        activity_post_id=post.id,
+        group_name=group.name,
+        is_members_only=post.is_members_only,
+        is_announcement=post.is_announcement,
+        trending_score=0.0,
+        friends_going=[UserOut.model_validate(user) for user in participant_users],
+        friends_interested=[],
+        total_interested=len(post.participants),
+        user_rsvp_status=RSVPStatusEnum.going if user_joined else None,
+        ai_reason_chip=f"{group.name} · {visibility_label}",
+        is_saved=False,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -340,6 +447,10 @@ async def build_feed_event_out(
         image_url=event.image_url,
         source=event.source,
         creator_id=event.creator_id,
+        activity_post_id=None,
+        group_name=None,
+        is_members_only=False,
+        is_announcement=False,
         trending_score=event.trending_score or 0.0,
         friends_going=friends_going,
         friends_interested=friends_interested,

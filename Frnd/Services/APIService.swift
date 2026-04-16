@@ -526,7 +526,9 @@ final class APIService: ObservableObject {
         longitude: Double?,
         scheduledTime: Date?,
         maxParticipants: Int?,
-        groupId: String?
+        groupId: String?,
+        isMembersOnly: Bool?,
+        isAnnouncement: Bool
     ) async throws -> ActivityPost {
         struct Body: Encodable {
             let title: String
@@ -538,6 +540,8 @@ final class APIService: ObservableObject {
             let scheduled_time: Date?
             let max_participants: Int?
             let group_id: String?
+            let is_members_only: Bool?
+            let is_announcement: Bool
         }
         return try await request(
             path: "/activities",
@@ -545,7 +549,8 @@ final class APIService: ObservableObject {
             body: Body(
                 title: title, description: description, activity_type: activityType,
                 location: location, latitude: latitude, longitude: longitude,
-                scheduled_time: scheduledTime, max_participants: maxParticipants, group_id: groupId
+                scheduled_time: scheduledTime, max_participants: maxParticipants, group_id: groupId,
+                is_members_only: isMembersOnly, is_announcement: isAnnouncement
             )
         )
     }
@@ -560,7 +565,9 @@ final class APIService: ObservableObject {
         longitude: Double?,
         scheduledTime: Date?,
         maxParticipants: Int?,
-        groupId: String?
+        groupId: String?,
+        isMembersOnly: Bool?,
+        isAnnouncement: Bool?
     ) async throws -> ActivityPost {
         struct Body: Encodable {
             let title: String
@@ -572,6 +579,8 @@ final class APIService: ObservableObject {
             let scheduled_time: Date?
             let max_participants: Int?
             let group_id: String?
+            let is_members_only: Bool?
+            let is_announcement: Bool?
         }
         return try await request(
             path: "/activities/\(id)",
@@ -579,7 +588,8 @@ final class APIService: ObservableObject {
             body: Body(
                 title: title, description: description, activity_type: activityType,
                 location: location, latitude: latitude, longitude: longitude,
-                scheduled_time: scheduledTime, max_participants: maxParticipants, group_id: groupId
+                scheduled_time: scheduledTime, max_participants: maxParticipants, group_id: groupId,
+                is_members_only: isMembersOnly, is_announcement: isAnnouncement
             )
         )
     }

@@ -265,8 +265,12 @@ struct Event: Codable, Identifiable {
     let category: EventCategory
     let tags: [String]
     let imageURL: String?
-    let source: String       // "aggregated" | "organic" | "user_created"
-    let creatorId: String?  = nil
+    let source: String       // "aggregated" | "organic" | "user_created" | "group_activity"
+    let creatorId: String?
+    let activityPostId: String?
+    let groupName: String?
+    let isMembersOnly: Bool
+    let isAnnouncement: Bool
     let trendingScore: Double
 
     // Feed-specific extras (injected by the feed endpoint)
@@ -300,6 +304,10 @@ struct Event: Codable, Identifiable {
         case imageURL     = "image_url"
         case source
         case creatorId     = "creator_id"
+        case activityPostId = "activity_post_id"
+        case groupName     = "group_name"
+        case isMembersOnly = "is_members_only"
+        case isAnnouncement = "is_announcement"
         case trendingScore = "trending_score"
         case friendsGoing     = "friends_going"
         case friendsInterested = "friends_interested"
@@ -499,6 +507,9 @@ struct ActivityPost: Codable, Identifiable {
     let scheduledTime: Date?
     let maxParticipants: Int?
     let groupId: String?
+    let groupName: String?
+    let isMembersOnly: Bool
+    let isAnnouncement: Bool
     let status: ActivityStatus
     let createdAt: Date
     var creator: User?
@@ -515,6 +526,9 @@ struct ActivityPost: Codable, Identifiable {
         case scheduledTime  = "scheduled_time"
         case maxParticipants = "max_participants"
         case groupId        = "group_id"
+        case groupName      = "group_name"
+        case isMembersOnly  = "is_members_only"
+        case isAnnouncement = "is_announcement"
         case status
         case createdAt      = "created_at"
         case creator, participants
@@ -671,7 +685,7 @@ extension Event {
             priceMin: 15, priceMax: 25,
             capacity: 200, category: .music,
             tags: ["Jazz", "Live Music", "Hyde Park"],
-            imageURL: nil, source: "organic", trendingScore: 0.87,
+            imageURL: nil, source: "organic", creatorId: nil, activityPostId: nil, groupName: nil, isMembersOnly: false, isAnnouncement: false, trendingScore: 0.87,
             friendsGoing: [
                 User(id: "u2", email: nil, phone: nil, university: nil, name: "Alex Chen", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
                 User(id: "u3", email: nil, phone: nil, university: nil, name: "Jordan Kim", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
@@ -697,7 +711,7 @@ extension Event {
             priceMin: 20, priceMax: 30,
             capacity: 500, category: .nightlife,
             tags: ["Electronic", "Techno", "Late Night"],
-            imageURL: nil, source: "organic", trendingScore: 0.92,
+            imageURL: nil, source: "organic", creatorId: nil, activityPostId: nil, groupName: nil, isMembersOnly: false, isAnnouncement: false, trendingScore: 0.92,
             friendsGoing: [
                 User(id: "u4", email: nil, phone: nil, university: nil, name: "Sam Rivera", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
             ],
@@ -722,7 +736,7 @@ extension Event {
             priceMin: 0, priceMax: nil,
             capacity: nil, category: .arts,
             tags: ["Art", "Free", "Hyde Park", "Social"],
-            imageURL: nil, source: "aggregated", trendingScore: 0.75,
+            imageURL: nil, source: "aggregated", creatorId: nil, activityPostId: nil, groupName: nil, isMembersOnly: false, isAnnouncement: false, trendingScore: 0.75,
             friendsGoing: [],
             friendsInterested: [],
             totalInterested: 89,
@@ -745,7 +759,7 @@ extension Event {
             priceMin: 35, priceMax: nil,
             capacity: 80, category: .foodDrink,
             tags: ["Brunch", "Bottomless", "West Loop"],
-            imageURL: nil, source: "organic", trendingScore: 0.68,
+            imageURL: nil, source: "organic", creatorId: nil, activityPostId: nil, groupName: nil, isMembersOnly: false, isAnnouncement: false, trendingScore: 0.68,
             friendsGoing: [
                 User(id: "u5", email: nil, phone: nil, university: nil, name: "Maya Johnson", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
                 User(id: "u6", email: nil, phone: nil, university: nil, name: "Tyler Brooks", avatarURL: nil, latitude: nil, longitude: nil, onboardingComplete: true, createdAt: Date()),
@@ -754,7 +768,7 @@ extension Event {
             friendsInterested: [],
             totalInterested: 34,
             userRSVPStatus: .interested,
-            aiReasonChip: "Alex, Maya + 3 friends going",
+            aiReasonChip: "Alex, Maya + 3 going",
             isSaved: false
         ),
     ]

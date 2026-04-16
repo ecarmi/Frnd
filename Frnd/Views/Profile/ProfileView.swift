@@ -7,17 +7,14 @@ import CoreLocation
 final class ProfileViewModel: ObservableObject {
     @Published var attendedEvents: [Event] = []
     @Published var myEvents: [Event] = []
-    @Published var friends: [Friendship] = []
     @Published var isLoading = false
 
     func load(savedEventsStore: SavedEventsStore) async {
         isLoading = true
         defer { isLoading = false }
-        async let friendsResult = try? APIService.shared.fetchFriends()
         async let savedResult = try? APIService.shared.fetchSavedEvents()
         async let attendedResult = try? APIService.shared.fetchAttendedEvents()
         async let myEventsResult = try? APIService.shared.fetchMyCreatedEvents()
-        friends = (await friendsResult) ?? []
         savedEventsStore.replaceSavedEvents((await savedResult) ?? savedEventsStore.savedEvents)
         attendedEvents = (await attendedResult) ?? []
         myEvents = (await myEventsResult) ?? []
@@ -36,7 +33,6 @@ struct ProfileView: View {
         case saved    = "Saved"
         case attended = "Attended"
         case myEvents = "My Events"
-        case friends  = "Friends"
     }
 
     var body: some View {
@@ -110,10 +106,10 @@ struct ProfileView: View {
             }
 
             // Invite button
-            ShareLink(item: "Join me on Frnd — the app for discovering campus events and making plans with friends. Download it here: https://frnd.app") {
+            ShareLink(item: "Join me on Frnd — the app for discovering campus events and making plans. Download it here: https://frnd.app") {
                 HStack(spacing: 6) {
                     Image(systemName: "person.badge.plus")
-                    Text("Invite Friends")
+                    Text("Invite People")
                 }
                 .font(.captionMedium)
                 .foregroundColor(.ember)
@@ -252,8 +248,6 @@ struct ProfileView: View {
                     }
                     .padding(.top, Spacing.md)
                 }
-            case .friends:
-                friendsList
             }
         }
         .padding(.top, Spacing.md)
@@ -272,35 +266,6 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 48)
         .padding(.horizontal, Spacing.xxxl)
-    }
-
-    private var friendsList: some View {
-        LazyVStack(spacing: Spacing.sm) {
-            if viewModel.friends.isEmpty {
-                emptyTabState(icon: "person.2", message: "Add friends to see their plans and activity")
-            } else {
-                ForEach(viewModel.friends) { friendship in
-                    if let user = friendship.otherUser {
-                        HStack(spacing: Spacing.md) {
-                            AvatarView(name: user.name, imageURL: user.avatarURL, size: 44)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(user.name)
-                                    .font(.headingSmall)
-                                    .foregroundColor(.textPrimary)
-                                PillView(
-                                    text: friendship.tier == .innerCircle ? "Inner Circle" : "Friend",
-                                    color: friendship.tier == .innerCircle ? .ember : .textSecondary
-                                )
-                            }
-                            Spacer()
-                        }
-                        .padding(Spacing.md)
-                        .cardStyle()
-                        .padding(.horizontal, Spacing.base)
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -472,7 +437,7 @@ private struct PrivacyPolicyView: View {
 
                     policySection("How We Use Your Information",
                         """
-                        Your information is used to personalize your event feed, connect you with friends, and improve the app experience. We do not sell your personal data to third parties.
+                        Your information is used to personalize your event feed, support shared plans and groups, and improve the app experience. We do not sell your personal data to third parties.
                         """)
 
                     policySection("Location Data",

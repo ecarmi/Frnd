@@ -68,6 +68,32 @@ final class FeedViewModel: ObservableObject {
 
     func rsvp(eventId: String, status: RSVPStatus) async {
         guard let index = events.firstIndex(where: { $0.id == eventId }) else { return }
+        if let activityPostId = events[index].activityPostId {
+            let wasJoined = events[index].userRSVPStatus == .going
+            events[index].userRSVPStatus = wasJoined ? nil : .going
+
+            do {
+                let updatedActivity: ActivityPost
+                if wasJoined {
+                    try await APIService.shared.leaveActivity(id: activityPostId)
+                    updatedActivity = try await APIService.shared.fetchActivity(id: activityPostId)
+                } else {
+                    updatedActivity = try await APIService.shared.joinActivity(id: activityPostId)
+                }
+
+                if let idx = events.firstIndex(where: { $0.id == eventId }) {
+                    events[idx].friendsGoing = updatedActivity.participants.compactMap(\.user)
+                    events[idx].totalInterested = updatedActivity.participantCount
+                    events[idx].userRSVPStatus = updatedActivity.isJoined ? .going : nil
+                }
+            } catch {
+                if let idx = events.firstIndex(where: { $0.id == eventId }) {
+                    events[idx].userRSVPStatus = wasJoined ? .going : nil
+                }
+            }
+            return
+        }
+
         let previousStatus = events[index].userRSVPStatus
         events[index].userRSVPStatus = status
 

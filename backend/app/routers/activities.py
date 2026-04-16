@@ -45,6 +45,9 @@ def _post_out(post: ActivityPost, current_user_id: str) -> ActivityPostOut:
         scheduled_time=post.scheduled_time,
         max_participants=post.max_participants,
         group_id=post.group_id,
+        group_name=post.group.name if post.group else None,
+        is_members_only=post.is_members_only,
+        is_announcement=post.is_announcement,
         status=post.status,
         created_at=post.created_at,
         creator=UserOut.model_validate(post.creator) if post.creator else None,
@@ -59,6 +62,7 @@ async def _load_post(post_id: str, db: AsyncSession) -> ActivityPost | None:
         select(ActivityPost)
         .options(
             selectinload(ActivityPost.creator).selectinload(User.taste_profile),
+            selectinload(ActivityPost.group).selectinload(Group.members),
             selectinload(ActivityPost.participants).selectinload(ActivityParticipant.user).selectinload(User.taste_profile),
         )
         .where(ActivityPost.id == post_id)
@@ -94,6 +98,28 @@ async def _ensure_group_admin(group_id: str, user_id: str, db: AsyncSession) -> 
     return group
 
 
+def _ensure_post_visibility(post: ActivityPost, current_user_id: str) -> None:
+    group = post.group
+    if not group:
+        return
+
+    membership = _group_membership(group, current_user_id)
+    if group.is_private and not membership:
+        raise HTTPException(status_code=403, detail="Private group")
+    if post.is_members_only and not membership:
+        raise HTTPException(status_code=403, detail="This post is only visible to group members")
+
+
+def _can_manage_post(post: ActivityPost, current_user_id: str) -> bool:
+    if post.creator_id == current_user_id:
+        return True
+    if not post.group:
+        return False
+
+    membership = _group_membership(post.group, current_user_id)
+    return bool(membership and membership.role in {GroupRoleEnum.owner, GroupRoleEnum.admin})
+
+
 @router.get("", response_model=list[ActivityPostOut])
 async def list_activities(
     group_id: str | None = Query(default=None),
@@ -111,6 +137,7 @@ async def list_activities(
         select(ActivityPost)
         .options(
             selectinload(ActivityPost.creator).selectinload(User.taste_profile),
+            selectinload(ActivityPost.group),
             selectinload(ActivityPost.participants).selectinload(ActivityParticipant.user).selectinload(User.taste_profile),
         )
         .where(ActivityPost.status == ActivityStatusEnum.open.value)
@@ -118,6 +145,8 @@ async def list_activities(
     )
     if group_id:
         q = q.where(ActivityPost.group_id == group_id)
+        if not _group_membership(group, current_user.id):
+            q = q.where(ActivityPost.is_members_only == False)
     else:
         # Public feed: no group_id
         q = q.where(ActivityPost.group_id.is_(None))
@@ -133,8 +162,14 @@ async def create_activity(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    resolved_members_only = False
     if body.group_id:
-        await _ensure_group_admin(body.group_id, current_user.id, db)
+        group = await _ensure_group_admin(body.group_id, current_user.id, db)
+        if body.is_announcement and group.is_private:
+            raise HTTPException(status_code=400, detail="Announcements are only supported in public groups")
+        resolved_members_only = body.is_members_only if body.is_members_only is not None else True
+    elif body.is_announcement:
+        raise HTTPException(status_code=400, detail="Announcements must be posted inside a group")
 
     post_id = str(uuid.uuid4())
     db.add(ActivityPost(
@@ -149,10 +184,13 @@ async def create_activity(
         scheduled_time=body.scheduled_time,
         max_participants=body.max_participants,
         group_id=body.group_id,
+        is_members_only=resolved_members_only,
+        is_announcement=body.is_announcement,
         status=ActivityStatusEnum.open,
     ))
-    # Creator auto-joins
-    db.add(ActivityParticipant(activity_id=post_id, user_id=current_user.id))
+    if not body.is_announcement:
+        # Participatory posts auto-include the creator.
+        db.add(ActivityParticipant(activity_id=post_id, user_id=current_user.id))
     await db.commit()
 
     loaded = await _load_post(post_id, db)
@@ -169,12 +207,18 @@ async def update_activity(
     post = await _load_post(post_id, db)
     if not post:
         raise HTTPException(status_code=404, detail="Activity not found")
-    if post.creator_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Only the creator can edit this activity")
+    if not _can_manage_post(post, current_user.id):
+        raise HTTPException(status_code=403, detail="Only the creator or a group admin can edit this activity")
 
     target_group_id = body.group_id if body.group_id is not None else post.group_id
+    target_group: Group | None = None
     if target_group_id:
-        await _ensure_group_admin(target_group_id, current_user.id, db)
+        target_group = await _ensure_group_admin(target_group_id, current_user.id, db)
+    if body.is_announcement is True:
+        if not target_group_id:
+            raise HTTPException(status_code=400, detail="Announcements must be posted inside a group")
+        if target_group and target_group.is_private:
+            raise HTTPException(status_code=400, detail="Announcements are only supported in public groups")
 
     if body.title is not None:
         trimmed_title = body.title.strip()
@@ -196,6 +240,14 @@ async def update_activity(
         post.max_participants = body.max_participants
     if body.group_id is not None:
         post.group_id = body.group_id
+    if body.is_members_only is not None:
+        if not target_group_id and body.is_members_only:
+            raise HTTPException(status_code=400, detail="Only group posts can be members only")
+        post.is_members_only = body.is_members_only if target_group_id else False
+    elif not target_group_id:
+        post.is_members_only = False
+    if body.is_announcement is not None:
+        post.is_announcement = body.is_announcement
 
     await db.commit()
     post = await _load_post(post.id, db)
@@ -211,6 +263,7 @@ async def get_activity(
     post = await _load_post(post_id, db)
     if not post:
         raise HTTPException(status_code=404, detail="Activity not found")
+    _ensure_post_visibility(post, current_user.id)
     return _post_out(post, current_user.id)
 
 
@@ -223,8 +276,11 @@ async def join_activity(
     post = await _load_post(post_id, db)
     if not post:
         raise HTTPException(status_code=404, detail="Activity not found")
+    _ensure_post_visibility(post, current_user.id)
     if not enum_equals(post.status, ActivityStatusEnum.open):
         raise HTTPException(status_code=400, detail="Activity is not open")
+    if post.is_announcement:
+        raise HTTPException(status_code=400, detail="Announcements cannot be joined")
 
     already = any(p.user_id == current_user.id for p in post.participants)
     if already:
@@ -269,8 +325,8 @@ async def delete_activity(
     post = await _load_post(post_id, db)
     if not post:
         raise HTTPException(status_code=404, detail="Activity not found")
-    if post.creator_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not the creator")
+    if not _can_manage_post(post, current_user.id):
+        raise HTTPException(status_code=403, detail="Only the creator or a group admin can delete this activity")
 
     post.status = ActivityStatusEnum.cancelled
     await db.commit()
