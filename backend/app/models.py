@@ -214,6 +214,7 @@ class Friendship(Base):
     user_a_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
     user_b_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
     tier: Mapped[FriendshipTierEnum] = mapped_column(EnumString(FriendshipTierEnum), default=FriendshipTierEnum.friend)
+    affinity_score: Mapped[float] = mapped_column(Float, default=0.0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -340,7 +341,7 @@ class ActivityPost(Base):
     location: Mapped[Optional[str]]         = mapped_column(String(500))
     latitude: Mapped[Optional[float]]       = mapped_column(Float)
     longitude: Mapped[Optional[float]]      = mapped_column(Float)
-    scheduled_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    scheduled_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     max_participants: Mapped[Optional[int]] = mapped_column(Integer)
     group_id: Mapped[Optional[str]]         = mapped_column(ForeignKey("groups.id"), nullable=True)
     is_members_only: Mapped[bool]           = mapped_column(Boolean, default=False)

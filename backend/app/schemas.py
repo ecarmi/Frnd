@@ -320,7 +320,7 @@ class ActivityPostOut(OrmBase):
     location: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    scheduled_time: Optional[datetime] = None
+    scheduled_time: datetime
     max_participants: Optional[int] = None
     group_id: Optional[str] = None
     group_name: Optional[str] = None
@@ -341,7 +341,7 @@ class ActivityPostCreate(BaseModel):
     location: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    scheduled_time: Optional[datetime] = None
+    scheduled_time: datetime
     max_participants: Optional[int] = None
     group_id: Optional[str] = None
     is_members_only: Optional[bool] = None

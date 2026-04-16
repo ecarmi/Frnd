@@ -88,16 +88,18 @@ async def get_feed(
 ) -> tuple[list[EventOut], Optional[str]]:
     """Returns ranked list of EventOut and optional next_cursor."""
 
-    # 1. Friend IDs — single query
+    # 1. Friend IDs + affinity scores — single query
     f_result = await db.execute(
         select(Friendship).where(
             or_(Friendship.user_a_id == user.id, Friendship.user_b_id == user.id)
         )
     )
     friend_ids: set[str] = set()
+    affinity_scores: dict[str, float] = {}
     for f in f_result.scalars().all():
         other = f.user_b_id if f.user_a_id == user.id else f.user_a_id
         friend_ids.add(other)
+        affinity_scores[other] = f.affinity_score
 
     # 2. Candidate events — single query with bounding box
     lat_delta = radius_km / 111.0
@@ -216,12 +218,24 @@ async def get_feed(
     user_vector = user.taste_vector or []
     scored_items: list[tuple[float, EventOut]] = []
     for event in events:
-        going = going_map.get(event.id, [])
-        interested = interested_map.get(event.id, [])
-        n_going, n_interested = len(going), len(interested)
+        going = sorted(
+            going_map.get(event.id, []),
+            key=lambda u: affinity_scores.get(u.id, 0.0),
+            reverse=True,
+        )
+        interested = sorted(
+            interested_map.get(event.id, []),
+            key=lambda u: affinity_scores.get(u.id, 0.0),
+            reverse=True,
+        )
 
         t_score = temporal_score(event.start_time)
-        soc_score = min(1.0, (n_going * 1.0 + n_interested * 0.5) / 5.0)
+
+        # Affinity-weighted social score — closer friends count more
+        weighted_going = sum(max(1.0, affinity_scores.get(u.id, 0.0)) for u in going)
+        weighted_interested = sum(max(0.5, affinity_scores.get(u.id, 0.0) * 0.5) for u in interested)
+        soc_score = min(1.0, (weighted_going + weighted_interested) / 10.0)
+
         ev_vector = event.attribute_vector or []
         t_sim = cosine_similarity(user_vector, ev_vector) if user_vector and ev_vector else 0.0
 
@@ -259,8 +273,8 @@ async def get_feed(
     for post in group_activities:
         if not post.group:
             continue
-        start_like = post.scheduled_time or post.created_at
-        t_score = temporal_score(start_like) if post.scheduled_time else 0.35
+        start_like = post.scheduled_time
+        t_score = temporal_score(start_like)
         participation_score = min(1.0, len(post.participants) / 6.0)
         membership_score = 1.0 if post.group_id in member_group_ids else 0.55
         final = 0.55 * t_score + 0.25 * participation_score + 0.20 * membership_score
@@ -322,7 +336,7 @@ def _build_group_activity_feed_out(post: ActivityPost, group: Group, current_use
             images=[],
             created_at=post.created_at,
         ),
-        start_time=post.scheduled_time or post.created_at,
+        start_time=post.scheduled_time,
         end_time=None,
         price_min=0,
         price_max=0,

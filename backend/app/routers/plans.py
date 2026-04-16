@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -17,6 +17,7 @@ from ..schemas import (
 )
 from ..auth import get_current_user, decode_token
 from ..services.feed import build_feed_event_out
+from ..services.social import recompute_affinities
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
@@ -315,6 +316,7 @@ async def update_status(
 @router.post("/join/{invite_code}", response_model=PlanOut)
 async def join_plan_by_code(
     invite_code: str,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -341,6 +343,7 @@ async def join_plan_by_code(
         type=MessageTypeEnum.system,
     ))
     await db.commit()
+    background_tasks.add_task(recompute_affinities, current_user.id)
 
     result = await db.execute(
         select(Plan)

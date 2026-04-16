@@ -167,7 +167,10 @@ async def create_activity(
         group = await _ensure_group_admin(body.group_id, current_user.id, db)
         if body.is_announcement and group.is_private:
             raise HTTPException(status_code=400, detail="Announcements are only supported in public groups")
-        resolved_members_only = body.is_members_only if body.is_members_only is not None else True
+        if body.is_announcement:
+            resolved_members_only = True
+        else:
+            resolved_members_only = body.is_members_only if body.is_members_only is not None else True
     elif body.is_announcement:
         raise HTTPException(status_code=400, detail="Announcements must be posted inside a group")
 
@@ -182,7 +185,7 @@ async def create_activity(
         latitude=body.latitude,
         longitude=body.longitude,
         scheduled_time=body.scheduled_time,
-        max_participants=body.max_participants,
+        max_participants=None if body.is_announcement else body.max_participants,
         group_id=body.group_id,
         is_members_only=resolved_members_only,
         is_announcement=body.is_announcement,
@@ -248,6 +251,10 @@ async def update_activity(
         post.is_members_only = False
     if body.is_announcement is not None:
         post.is_announcement = body.is_announcement
+        if body.is_announcement:
+            post.is_members_only = True
+            post.max_participants = None
+            post.location = None
 
     await db.commit()
     post = await _load_post(post.id, db)

@@ -1,7 +1,7 @@
 import secrets
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -14,6 +14,7 @@ from ..schemas import (
     GroupMemberOut, UserOut,
 )
 from ..auth import get_current_user
+from ..services.social import recompute_affinities
 
 router = APIRouter(prefix="/groups", tags=["groups"])
 
@@ -142,6 +143,7 @@ async def get_group(
 @router.post("/join", response_model=GroupOut)
 async def join_by_invite(
     body: GroupJoin,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -159,6 +161,7 @@ async def join_by_invite(
         db.add(GroupMembership(group_id=group.id, user_id=current_user.id, role=GroupRoleEnum.member))
         await db.commit()
         group = await _load_group(group.id, db)
+        background_tasks.add_task(recompute_affinities, current_user.id)
 
     return _group_out(group)
 
@@ -166,6 +169,7 @@ async def join_by_invite(
 @router.post("/{group_id}/join", response_model=GroupOut)
 async def join_public_group(
     group_id: str,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -179,6 +183,7 @@ async def join_public_group(
         db.add(GroupMembership(group_id=group.id, user_id=current_user.id, role=GroupRoleEnum.member))
         await db.commit()
         group = await _load_group(group.id, db)
+        background_tasks.add_task(recompute_affinities, current_user.id)
 
     return _group_out(group)
 

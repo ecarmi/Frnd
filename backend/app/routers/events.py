@@ -2,7 +2,7 @@ import logging
 import traceback
 import uuid
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, HTTPException
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
@@ -18,6 +18,7 @@ from ..models import (
 from ..schemas import EventOut, EventCreate, RSVPOut, RSVPBody, FeedResponse
 from ..auth import get_current_user
 from ..services.feed import build_feed_event_out
+from ..services.social import recompute_affinities
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -164,15 +165,14 @@ async def delete_event(
 async def rsvp_event(
     event_id: str,
     body: RSVPBody,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Check event exists
     result = await db.execute(select(Event).where(Event.id == event_id))
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Event not found")
 
-    # Upsert
     existing = await db.execute(
         select(RSVP).where(RSVP.user_id == current_user.id, RSVP.event_id == event_id)
     )
@@ -185,6 +185,7 @@ async def rsvp_event(
 
     await db.commit()
     await db.refresh(rsvp)
+    background_tasks.add_task(recompute_affinities, current_user.id)
     return rsvp
 
 
