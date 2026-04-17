@@ -393,11 +393,13 @@ struct SearchResultRow: View {
                     Text(event.venue.name)
                         .font(.captionMedium)
                         .foregroundColor(.textSecondary)
+                        .lineLimit(1)
                     Text("·")
                         .foregroundColor(.textTertiary)
                     Text(event.startTime.relativeEventTime)
                         .font(.captionMedium)
                         .foregroundColor(.ember)
+                        .lineLimit(1)
                 }
             }
             Spacer()
@@ -412,6 +414,8 @@ struct SearchResultRow: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(minHeight: 72)
         .padding(Spacing.md)
         .cardStyle()
     }

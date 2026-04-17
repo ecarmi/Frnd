@@ -4,24 +4,26 @@ import UIKit
 
 struct CreateEventView: View {
     let groupId: String?
+    let existingEvent: Event?
     var onCreated: ((Event) -> Void)?
+    var onUpdated: ((Event) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @FocusState private var focusedField: Field?
 
     // Form fields
-    @State private var title = ""
-    @State private var description = ""
-    @State private var category: EventCategory = .other
-    @State private var startDate = Date()
+    @State private var title: String
+    @State private var description: String
+    @State private var category: EventCategory
+    @State private var startDate: Date
     @State private var hasEndTime = false
-    @State private var endDate = Date().addingTimeInterval(7200)
+    @State private var endDate: Date
     @State private var isPaid = false
-    @State private var priceText = ""
-    @State private var venueName = ""
-    @State private var venueAddress = ""
+    @State private var priceText: String
+    @State private var venueName: String
+    @State private var venueAddress: String
     @State private var hasCapacity = false
-    @State private var capacityText = ""
+    @State private var capacityText: String
 
     // State
     @State private var isSubmitting = false
@@ -39,6 +41,31 @@ struct CreateEventView: View {
         case venueAddress
         case price
         case capacity
+    }
+
+    init(
+        groupId: String?,
+        existingEvent: Event? = nil,
+        onCreated: ((Event) -> Void)? = nil,
+        onUpdated: ((Event) -> Void)? = nil
+    ) {
+        self.groupId = groupId
+        self.existingEvent = existingEvent
+        self.onCreated = onCreated
+        self.onUpdated = onUpdated
+
+        _title = State(initialValue: existingEvent?.title ?? "")
+        _description = State(initialValue: existingEvent?.description ?? "")
+        _category = State(initialValue: existingEvent?.category ?? .other)
+        _startDate = State(initialValue: existingEvent?.startTime ?? Date())
+        _hasEndTime = State(initialValue: existingEvent?.endTime != nil)
+        _endDate = State(initialValue: existingEvent?.endTime ?? (existingEvent?.startTime.addingTimeInterval(7200) ?? Date().addingTimeInterval(7200)))
+        _isPaid = State(initialValue: (existingEvent?.priceMin ?? 0) > 0)
+        _priceText = State(initialValue: existingEvent?.priceMin.map { String(Int($0)) } ?? "")
+        _venueName = State(initialValue: existingEvent?.venue.name ?? "")
+        _venueAddress = State(initialValue: existingEvent?.venue.address ?? "")
+        _hasCapacity = State(initialValue: existingEvent?.capacity != nil)
+        _capacityText = State(initialValue: existingEvent?.capacity.map(String.init) ?? "")
     }
 
     var body: some View {
@@ -61,7 +88,7 @@ struct CreateEventView: View {
                 )
                 .scrollContentBackground(.hidden)
             }
-            .navigationTitle("Post Event")
+            .navigationTitle(existingEvent == nil ? "Post Event" : "Edit Event")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -69,7 +96,7 @@ struct CreateEventView: View {
                         .foregroundColor(.textSecondary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Post") {
+                    Button(existingEvent == nil ? "Post" : "Save") {
                         Task { await submit() }
                     }
                     .foregroundColor(.ember)
@@ -327,8 +354,14 @@ struct CreateEventView: View {
         )
 
         do {
-            let event = try await APIService.shared.createEvent(body)
-            onCreated?(event)
+            let event: Event
+            if let existingEvent {
+                event = try await APIService.shared.updateEvent(id: existingEvent.id, body: body)
+                onUpdated?(event)
+            } else {
+                event = try await APIService.shared.createEvent(body)
+                onCreated?(event)
+            }
             dismiss()
         } catch {
             alertMessage = error.localizedDescription

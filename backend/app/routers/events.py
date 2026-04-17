@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, HTTPException
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -16,11 +16,29 @@ from ..models import (
     Group, GroupMembership, GroupRoleEnum,
 )
 from ..schemas import EventOut, EventCreate, RSVPOut, RSVPBody, FeedResponse
+from ..schemas import UserOut
 from ..auth import get_current_user
 from ..services.feed import build_feed_event_out
 from ..services.social import recompute_affinities
 
 router = APIRouter(prefix="/events", tags=["events"])
+
+
+async def _can_manage_event(event: Event, current_user: User, db: AsyncSession) -> bool:
+    if event.creator_id == current_user.id:
+        return True
+
+    if not event.group_id:
+        return False
+
+    membership_result = await db.execute(
+        select(GroupMembership).where(
+            GroupMembership.group_id == event.group_id,
+            GroupMembership.user_id == current_user.id,
+        )
+    )
+    membership = membership_result.scalar_one_or_none()
+    return bool(membership and membership.role in {GroupRoleEnum.owner, GroupRoleEnum.admin})
 
 
 @router.get("/search", response_model=list[EventOut])
@@ -76,6 +94,31 @@ async def get_event(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     return await build_feed_event_out(event, current_user, db)
+
+
+@router.get("/{event_id}/attendees", response_model=list[UserOut])
+async def get_event_attendees(
+    event_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    event_result = await db.execute(select(Event).where(Event.id == event_id))
+    event = event_result.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    result = await db.execute(
+        select(User)
+        .join(RSVP, RSVP.user_id == User.id)
+        .options(selectinload(User.taste_profile))
+        .where(
+            RSVP.event_id == event_id,
+            RSVP.status == RSVPStatusEnum.going.value,
+        )
+        .order_by(RSVP.created_at.asc())
+    )
+    attendees = result.scalars().unique().all()
+    return [UserOut.model_validate(attendee) for attendee in attendees]
 
 
 @router.post("", response_model=EventOut, status_code=201)
@@ -155,10 +198,75 @@ async def delete_event(
     event = result.scalar_one_or_none()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    if event.creator_id != current_user.id:
-        raise HTTPException(status_code=403, detail="You can only delete your own events")
+    if not await _can_manage_event(event, current_user, db):
+        raise HTTPException(status_code=403, detail="You can only manage events you created or group events you administer")
     await db.delete(event)
     await db.commit()
+
+
+@router.patch("/{event_id}", response_model=EventOut)
+async def update_event(
+    event_id: str,
+    body: EventCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Event)
+        .options(selectinload(Event.venue))
+        .where(Event.id == event_id)
+    )
+    event = result.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    if not await _can_manage_event(event, current_user, db):
+        raise HTTPException(status_code=403, detail="You can only manage events you created or group events you administer")
+
+    if body.venue_id:
+        venue_result = await db.execute(select(Venue).where(Venue.id == body.venue_id))
+        venue = venue_result.scalar_one_or_none()
+        if not venue:
+            raise HTTPException(status_code=404, detail="Venue not found")
+        event.venue_id = body.venue_id
+    elif body.venue:
+        if event.venue is None:
+            venue_id = str(uuid.uuid4())
+            db.add(Venue(
+                id=venue_id,
+                name=body.venue.name,
+                address=body.venue.address,
+                latitude=body.venue.latitude,
+                longitude=body.venue.longitude,
+            ))
+            event.venue_id = venue_id
+        else:
+            event.venue.name = body.venue.name
+            event.venue.address = body.venue.address
+            event.venue.latitude = body.venue.latitude
+            event.venue.longitude = body.venue.longitude
+
+    event.title = body.title
+    event.description = body.description
+    event.start_time = body.start_time
+    event.end_time = body.end_time
+    event.price_min = body.price_min
+    event.price_max = body.price_max
+    event.capacity = body.capacity
+    event.category = body.category
+    event.tags = body.tags
+    event.image_url = body.image_url
+    event.group_id = body.group_id if body.group_id is not None else event.group_id
+
+    await db.commit()
+
+    refreshed_result = await db.execute(
+        select(Event)
+        .options(selectinload(Event.venue))
+        .where(Event.id == event_id)
+    )
+    refreshed = refreshed_result.scalar_one()
+    return await build_feed_event_out(refreshed, current_user, db)
 
 
 @router.post("/{event_id}/rsvp", response_model=RSVPOut)

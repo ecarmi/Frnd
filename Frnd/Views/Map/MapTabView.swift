@@ -84,8 +84,33 @@ final class MapViewModel: ObservableObject {
                 maxLng: center.longitude + span.longitudeDelta / 2
             )
         } catch {
+            if isCancellation(error) {
+                return
+            }
             self.error = error.localizedDescription
         }
+    }
+
+    private func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+
+        if let urlError = error as? URLError {
+            return urlError.code == .cancelled
+        }
+
+        if let apiError = error as? APIError {
+            switch apiError {
+            case .networkError(let underlying):
+                return isCancellation(underlying)
+            default:
+                break
+            }
+        }
+
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 }
 

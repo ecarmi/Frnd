@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
-from ..models import User, Friendship, TasteProfile, SavedEvent, Event, RSVP, RSVPStatusEnum, ActivityPost, ActivityParticipant
+from ..models import (
+    User, Friendship, TasteProfile, SavedEvent, Event, RSVP, RSVPStatusEnum,
+    ActivityPost, ActivityParticipant, GroupMembership, GroupRoleEnum,
+)
 from ..schemas import UserOut, UserUpdate, FriendshipOut, OnboardingBody, EventOut
 from ..services.feed import build_feed_event_out, _build_group_activity_feed_out
 from ..auth import get_current_user
@@ -201,8 +204,17 @@ async def get_my_created_events(
     result = await db.execute(
         select(Event)
         .options(selectinload(Event.venue))
-        .where(Event.creator_id == current_user.id)
+        .outerjoin(GroupMembership, Event.group_id == GroupMembership.group_id)
+        .where(
+            or_(
+                Event.creator_id == current_user.id,
+                and_(
+                    GroupMembership.user_id == current_user.id,
+                    GroupMembership.role.in_([GroupRoleEnum.owner.value, GroupRoleEnum.admin.value]),
+                ),
+            )
+        )
         .order_by(Event.start_time.desc())
     )
-    events = result.scalars().all()
+    events = result.scalars().unique().all()
     return [await build_feed_event_out(e, current_user, db) for e in events]

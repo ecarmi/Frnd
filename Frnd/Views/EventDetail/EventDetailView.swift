@@ -8,6 +8,10 @@ struct EventDetailView: View {
     @State private var rsvpStatus: RSVPStatus?
     @State private var showCreatePlan = false
     @State private var isRSVPLoading = false
+    @State private var showAttendees = false
+    @State private var attendees: [User] = []
+    @State private var isLoadingAttendees = false
+    @State private var attendeeError: String?
 
     init(event: Event) {
         _event = State(initialValue: event)
@@ -113,6 +117,14 @@ struct EventDetailView: View {
         .sheet(isPresented: $showCreatePlan) {
             CreatePlanView(prefillEvent: event)
         }
+        .sheet(isPresented: $showAttendees) {
+            AttendeesSheet(
+                title: event.title,
+                attendees: attendees,
+                isLoading: isLoadingAttendees,
+                error: attendeeError
+            )
+        }
         .task {
             await refreshEvent()
         }
@@ -160,38 +172,36 @@ struct EventDetailView: View {
 
     private var attendeeStrip: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            Text("Who's going")
-                .font(.headingSmall)
-                .foregroundColor(.textPrimary)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: -8) {
-                    ForEach(event.friendsGoing.prefix(8)) { user in
-                        AvatarView(name: user.name, imageURL: user.avatarURL, size: 40)
-                            .overlay(Circle().strokeBorder(Color.bgPrimary, lineWidth: 2))
+            Button {
+                Task { await loadAttendees() }
+            } label: {
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    HStack {
+                        Text("Who's going")
+                            .font(.headingSmall)
+                            .foregroundColor(.textPrimary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.captionMedium)
+                            .foregroundColor(.textTertiary)
                     }
-                    if event.totalInterested > event.friendsGoing.count {
-                        let extra = event.totalInterested - event.friendsGoing.count
-                        ZStack {
-                            Circle().fill(Color.bgRaised)
-                            Text("+\(extra)")
-                                .font(.captionSmall)
-                                .foregroundColor(.textSecondary)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: -8) {
+                            ForEach(event.friendsGoing.prefix(8)) { user in
+                                AvatarView(name: user.name, imageURL: user.avatarURL, size: 40)
+                                    .overlay(Circle().strokeBorder(Color.bgPrimary, lineWidth: 2))
+                            }
                         }
-                        .frame(width: 40, height: 40)
-                        .overlay(Circle().strokeBorder(Color.bgPrimary, lineWidth: 2))
+                        .padding(.horizontal, 2)
                     }
-                }
-                .padding(.horizontal, 2)
-            }
 
-            let names = event.friendsGoing.prefix(2).map { $0.name.components(separatedBy: " ").first ?? $0.name }.joined(separator: ", ")
-            if !names.isEmpty {
-                let extra = max(0, event.friendsGoing.count - 2)
-                Text(extra > 0 ? "\(names) + \(extra) going" : "\(names) going")
-                    .font(.captionMedium)
-                    .foregroundColor(.textSecondary)
+                    Text("Tap to view the attendee list")
+                        .font(.captionMedium)
+                        .foregroundColor(.textSecondary)
+                }
             }
+            .buttonStyle(.plain)
         }
     }
 
@@ -308,10 +318,37 @@ struct EventDetailView: View {
     }
 
     private func refreshEvent() async {
-        guard event.activityPostId == nil else { return }
+        if let activityPostId = event.activityPostId {
+            guard let activity = try? await APIService.shared.fetchActivity(id: activityPostId) else { return }
+            event.friendsGoing = activity.participants.compactMap(\.user)
+            event.totalInterested = activity.participantCount
+            event.userRSVPStatus = activity.isJoined ? .going : nil
+            rsvpStatus = event.userRSVPStatus
+            return
+        }
+
         guard let refreshed = try? await APIService.shared.fetchEvent(id: event.id) else { return }
         event = refreshed
         rsvpStatus = refreshed.userRSVPStatus
+    }
+
+    private func loadAttendees() async {
+        isLoadingAttendees = true
+        attendeeError = nil
+        showAttendees = true
+        defer { isLoadingAttendees = false }
+
+        do {
+            if let activityPostId = event.activityPostId {
+                let activity = try await APIService.shared.fetchActivity(id: activityPostId)
+                attendees = activity.participants.compactMap(\.user)
+            } else {
+                attendees = try await APIService.shared.fetchEventAttendees(id: event.id)
+            }
+        } catch {
+            attendees = []
+            attendeeError = error.localizedDescription
+        }
     }
 
     private var primaryTimeLabel: String {
@@ -363,6 +400,72 @@ struct EventDetailView: View {
                             PillView(text: tag, color: .teal)
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+private struct AttendeesSheet: View {
+    let title: String
+    let attendees: [User]
+    let isLoading: Bool
+    let error: String?
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.bgPrimary.ignoresSafeArea()
+
+                if isLoading {
+                    ProgressView()
+                        .tint(.ember)
+                } else if let error {
+                    LoadErrorCard(
+                        title: "Could not load attendees",
+                        message: error,
+                        retryTitle: "Close",
+                        retry: { dismiss() }
+                    )
+                    .padding(.horizontal, Spacing.base)
+                } else if attendees.isEmpty {
+                    VStack(spacing: Spacing.md) {
+                        Text("No one is going yet")
+                            .font(.headingMedium)
+                            .foregroundColor(.textPrimary)
+                        Text("Attendees will appear here once people join.")
+                            .font(.bodyMedium)
+                            .foregroundColor(.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.horizontal, Spacing.xxxl)
+                } else {
+                    ScrollView(showsIndicators: false) {
+                        LazyVStack(spacing: Spacing.sm) {
+                            ForEach(attendees) { attendee in
+                                HStack(spacing: Spacing.md) {
+                                    AvatarView(name: attendee.name, imageURL: attendee.avatarURL, size: 44)
+                                    Text(attendee.name)
+                                        .font(.bodyLarge)
+                                        .foregroundColor(.textPrimary)
+                                    Spacer()
+                                }
+                                .padding(Spacing.md)
+                                .cardStyle()
+                            }
+                        }
+                        .padding(Spacing.base)
+                    }
+                }
+            }
+            .navigationTitle("Attendees")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .foregroundColor(.textSecondary)
                 }
             }
         }

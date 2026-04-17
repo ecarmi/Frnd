@@ -6,11 +6,14 @@ import CoreLocation
 final class FeedViewModel: ObservableObject {
     @Published var events: [Event] = []
     @Published var goingEvents: [Event] = []
+    @Published var myEvents: [Event] = []
     @Published var isLoading = false
     @Published var isLoadingGoing = false
+    @Published var isLoadingMyEvents = false
     @Published var isLoadingMore = false
     @Published var error: String?
     @Published var goingError: String?
+    @Published var myEventsError: String?
     @Published var areaLabel = AppConfig.defaultAreaLabel
 
     private var nextCursor: String?
@@ -86,6 +89,32 @@ final class FeedViewModel: ObservableObject {
             goingEvents = []
             goingError = error.localizedDescription
         }
+    }
+
+    func loadMyEvents() async {
+        guard !isLoadingMyEvents else { return }
+        isLoadingMyEvents = true
+        myEventsError = nil
+        defer { isLoadingMyEvents = false }
+
+        do {
+            myEvents = try await APIService.shared.fetchMyCreatedEvents()
+        } catch {
+            if isCancellation(error) {
+                return
+            }
+            myEvents = []
+            myEventsError = error.localizedDescription
+        }
+    }
+
+    func insertOrUpdateMyEvent(_ event: Event) {
+        myEvents.removeAll { $0.id == event.id }
+        myEvents.insert(event, at: 0)
+    }
+
+    func removeMyEvent(id: String) {
+        myEvents.removeAll { $0.id == id }
     }
 
     func loadMoreIfNeeded(currentEvent: Event) async {

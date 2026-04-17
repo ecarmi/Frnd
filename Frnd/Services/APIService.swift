@@ -230,6 +230,10 @@ final class APIService: ObservableObject {
         try await request(path: "/events/\(id)")
     }
 
+    func fetchEventAttendees(id: String) async throws -> [User] {
+        try await request(path: "/events/\(id)/attendees")
+    }
+
     func searchEvents(query: String, lat: Double? = nil, lng: Double? = nil) async throws -> [Event] {
         var path = "/events/search?q=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query)"
         if let lat = lat, let lng = lng { path += "&lat=\(lat)&lng=\(lng)" }
@@ -396,6 +400,10 @@ final class APIService: ObservableObject {
 
     func createEvent(_ body: CreateEventBody) async throws -> Event {
         try await request(path: "/events", method: "POST", body: body)
+    }
+
+    func updateEvent(id: String, body: CreateEventBody) async throws -> Event {
+        try await request(path: "/events/\(id)", method: "PATCH", body: body)
     }
 
     func deleteEvent(id: String) async throws {
